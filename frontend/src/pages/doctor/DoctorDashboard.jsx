@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { appointmentApi, notificationApi, vitalApi } from "../../utils/apiHelper";
+import { appointmentApi, blogApi, forumApi, notificationApi, vitalApi } from "../../utils/apiHelper";
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
 import { formatIslamabadDateTime } from "../../utils/dateTime";
@@ -26,23 +26,29 @@ const STATUS_PILL_STYLES = {
 const DoctorDashboard = () => {
   const user = useMemo(() => getStoredUser(), []);
   const userId = user?.id;
-  const [stats, setStats] = useState({ appointments: [], patients: [], alerts: [], notifications: [] });
+  const [stats, setStats] = useState({ appointments: [], patients: [], alerts: [], notifications: [], blogLikes: 0, forumLikes: 0 });
 
   const load = async () => {
     if (!userId) return;
     try {
-      const [appointmentsRes, alertsRes, notificationsRes] = await Promise.all([
+      const [appointmentsRes, alertsRes, notificationsRes, blogsRes, forumRes] = await Promise.all([
         appointmentApi.byDoctor(userId),
         vitalApi.alerts(userId),
         notificationApi.list(userId),
+        blogApi.feed(userId),
+        forumApi.feed(userId),
       ]);
 
       const appointments = appointmentsRes.data || [];
+      const blogLikes = (blogsRes.data || []).reduce((sum, article) => sum + (article.likes_count || 0), 0);
+      const forumLikes = (forumRes.data || []).reduce((sum, post) => sum + (post.likes_count || 0), 0);
       setStats({
         appointments,
         patients: patientsFromAppointments(appointments),
         alerts: alertsRes.data || [],
         notifications: notificationsRes.data || [],
+        blogLikes,
+        forumLikes,
       });
     } catch (error) {
       console.error(error);
@@ -110,6 +116,23 @@ const DoctorDashboard = () => {
             <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unreadNotifications}</div>
           </div>
           <div style={{ color: "#2563eb", fontWeight: 900 }}>🔔</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Total Blog Likes</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{stats.blogLikes}</div>
+          </div>
+          <div style={{ color: "#16a34a", fontWeight: 900 }}>❤️</div>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Total Forum Likes</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{stats.forumLikes}</div>
+          </div>
+          <div style={{ color: "#a855f7", fontWeight: 900 }}>💬</div>
         </div>
       </div>
 

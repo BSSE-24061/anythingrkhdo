@@ -13,17 +13,19 @@ const Blogs = () => {
   const [commentText, setCommentText] = useState({});
   const [userLikedArticles, setUserLikedArticles] = useState(new Set());
   const [liking, setLiking] = useState({});
+  const [notice, setNotice] = useState("");
 
   const load = async () => {
     try {
       const [feedResponse, pendingResponse, bookmarksResponse] = await Promise.all([
-        blogApi.feed(), 
-        blogApi.pending(),
+        blogApi.feed(user.id), 
+        blogApi.pending(user.id),
         blogApi.bookmarks(user.id)
       ]);
       setFeed(feedResponse.data || []);
       setPending(pendingResponse.data || []);
       setBookmarks(bookmarksResponse.data || []);
+      setNotice("");
       
       // Build set of articles already liked by this user
       const likedIds = new Set();
@@ -62,22 +64,25 @@ const Blogs = () => {
   };
 
   const likeArticle = async (articleId) => {
-    // Prevent double-like
-    if (userLikedArticles.has(articleId) || liking[articleId]) {
+    if (userLikedArticles.has(articleId)) {
+      setNotice("You already liked this article.");
       return;
     }
+    if (liking[articleId]) return;
 
     setLiking((prev) => ({ ...prev, [articleId]: true }));
 
     try {
       await blogApi.like({ article_id: articleId, user_id: user.id });
       setUserLikedArticles((prev) => new Set(prev).add(articleId));
+      setNotice("Thanks for liking this article.");
       load();
     } catch (error) {
       console.error(error);
-      // Check if error is duplicate like
-      if (error?.response?.status === 400 || error?.message?.toLowerCase().includes("already")) {
+      const message = error?.response?.data?.error || error?.message || "Unable to like article.";
+      if (message.toLowerCase().includes("already")) {
         setUserLikedArticles((prev) => new Set(prev).add(articleId));
+        setNotice("You already liked this article.");
       }
     } finally {
       setLiking((prev) => ({ ...prev, [articleId]: false }));
@@ -125,6 +130,8 @@ const Blogs = () => {
         </div>
       </section>
 
+      {notice && <p className="alert alert-success" style={{ margin: "24px 0 0 0" }}>{notice}</p>}
+
       <section className="grid-layout two-col" style={{ gap: 32 }}>
         <div style={{ background: "#fff", borderRadius: 24, padding: 32, border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", height: "fit-content" }}>
           <div className="section-heading" style={{ marginBottom: 24 }}><h3 style={{ fontSize: "1.5rem", color: "#0f172a", margin: 0 }}>Create Article</h3></div>
@@ -149,16 +156,21 @@ const Blogs = () => {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="blog-carousel">
             {items.length ? items.map((article) => (
-              <div key={article.article_id} style={{ background: "#fff", borderRadius: 20, padding: 24, border: "1px solid #e2e8f0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <div key={article.article_id} className="blog-card" style={{ padding: 24, minWidth: 340, maxWidth: 420 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "center" }}>
                   <h4 style={{ margin: 0, fontSize: "1.3rem", color: "#0f172a" }}>{article.title}</h4>
                   <span style={{ background: "#f1f5f9", padding: "4px 10px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 700, color: "#475569" }}>
                     By {article.author_name || article.author_user_id}
                   </span>
                 </div>
-                <p style={{ color: "#475569", lineHeight: 1.6, fontSize: "1.05rem", margin: "0 0 20px 0" }}>{article.body}</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <p style={{ color: "#475569", lineHeight: 1.6, fontSize: "1.05rem", margin: 0, flex: 1 }}>{article.body}</p>
+                  <div style={{ marginLeft: 16, padding: "6px 12px", borderRadius: 999, background: "#eef2ff", color: "#4338ca", fontWeight: 700, fontSize: "0.85rem" }}>
+                    ❤️ {article.likes_count || 0}
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
                   <button 
                     onClick={() => likeArticle(article.article_id)}

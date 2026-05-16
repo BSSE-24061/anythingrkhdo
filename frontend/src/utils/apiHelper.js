@@ -104,9 +104,10 @@ export const chatApi = {
 };
 
 export const forumApi = {
-  feed: () => api.get("/community/posts"),
+  feed: (userId) => api.get("/community/posts", { params: { userId } }),
   createPost: (payload) => api.post("/community/posts", payload),
   getPost: (postId) => api.get(`/community/posts/${postId}`),
+  like: (payload) => api.post("/community/likes", payload),
   reply: (payload) => api.post("/community/replies", payload),
   report: (payload) => api.post("/community/reports", payload),
   reports: () => api.get("/community/reports"),
@@ -115,9 +116,9 @@ export const forumApi = {
 };
 
 export const blogApi = {
-  feed: () => api.get("/blogs"),
+  feed: (userId) => api.get("/blogs", { params: { userId } }),
   getArticle: (articleId, userId) => api.get(`/blogs/${articleId}`, { params: { userId } }),
-  pending: () => api.get("/blogs/pending"),
+  pending: (userId) => api.get("/blogs/pending", { params: { userId } }),
   create: (payload) => api.post("/blogs", payload),
   updateStatus: (articleId, status) =>
     api.patch(`/blogs/${articleId}/status`, { status }),

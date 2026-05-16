@@ -66,10 +66,10 @@ const PatientDashboard = () => {
         const historyResponse = await historyApi.getByPatient(user.id);
         setRecentHistory(historyResponse.data || []);
 
-        const blogsResponse = await blogApi.feed();
+        const blogsResponse = await blogApi.feed(user.id);
         setBlogs(blogsResponse.data || []);
 
-        const forumResponse = await forumApi.feed();
+        const forumResponse = await forumApi.feed(user.id);
         setForumPosts(forumResponse.data || []);
       } catch (err) {
         console.error("Error loading patient data:", err);

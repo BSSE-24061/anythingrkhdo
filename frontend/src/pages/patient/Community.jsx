@@ -15,15 +15,15 @@ const Community = () => {
     try {
       setError("");
       const [forumRes, blogRes] = await Promise.all([
-        forumApi.feed(),
-        blogApi.feed(),
+        forumApi.feed(user?.id),
+        blogApi.feed(user?.id),
       ]);
       setForumPosts(forumRes.data);
       setBlogs(blogRes.data);
 
       if (user?.role === "admin") {
         const [pendingRes, reportsRes] = await Promise.all([
-          blogApi.pending(),
+          blogApi.pending(user?.id),
           forumApi.reports(),
         ]);
         setPendingBlogs(pendingRes.data);

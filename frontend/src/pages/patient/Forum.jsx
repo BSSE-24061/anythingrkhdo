@@ -20,16 +20,24 @@ const Forum = () => {
   const [userLikedPosts, setUserLikedPosts] = useState(new Set());
   const [liking, setLiking] = useState({});
   const [postLikeCounts, setPostLikeCounts] = useState({});
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
   const loadPosts = async () => {
     try {
-      const response = await forumApi.feed();
+      const response = await forumApi.feed(user?.id);
       const fetchedPosts = response.data || [];
       setPosts(fetchedPosts);
       const counts = {};
-      fetchedPosts.forEach(post => { counts[post.post_id] = post.likes_count || 0; });
+      const likedIds = new Set();
+      fetchedPosts.forEach(post => {
+        counts[post.post_id] = post.likes_count || 0;
+        if (post.user_has_liked) {
+          likedIds.add(post.post_id);
+        }
+      });
+      setUserLikedPosts(likedIds);
       setPostLikeCounts(counts);
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load forum posts."));
@@ -73,12 +81,29 @@ const Forum = () => {
     }
   };
 
-  const likePost = (postId) => {
-    if (userLikedPosts.has(postId) || liking[postId]) return;
+  const likePost = async (postId) => {
+    if (userLikedPosts.has(postId)) {
+      setNotice("You already liked this post.");
+      return;
+    }
+    if (liking[postId]) return;
     setLiking((prev) => ({ ...prev, [postId]: true }));
-    setUserLikedPosts((prev) => new Set(prev).add(postId));
-    setPostLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-    setTimeout(() => { setLiking((prev) => ({ ...prev, [postId]: false })); }, 300);
+    try {
+      await forumApi.like({ post_id: postId, user_id: user.id });
+      setUserLikedPosts((prev) => new Set(prev).add(postId));
+      setPostLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+      setNotice("Thanks for liking this post.");
+    } catch (err) {
+      const message = getErrorMessage(err, "Unable to like post.");
+      if (message.toLowerCase().includes("already")) {
+        setUserLikedPosts((prev) => new Set(prev).add(postId));
+        setNotice("You already liked this post.");
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLiking((prev) => ({ ...prev, [postId]: false }));
+    }
   };
 
   return (
@@ -103,6 +128,7 @@ const Forum = () => {
       </section>
 
       {error && <p className="error-banner" style={{ marginBottom: 24 }}>{error}</p>}
+      {notice && <p className="alert alert-success" style={{ marginBottom: 24 }}>{notice}</p>}
 
       <div style={{ maxWidth: 840, margin: "0 auto", width: "100%", display: "grid", gap: 24 }}>
         

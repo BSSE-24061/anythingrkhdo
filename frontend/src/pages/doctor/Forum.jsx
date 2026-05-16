@@ -14,17 +14,23 @@ const Forum = () => {
   const [userLikedPosts, setUserLikedPosts] = useState(new Set());
   const [liking, setLiking] = useState({});
   const [postLikeCounts, setPostLikeCounts] = useState({});
+  const [notice, setNotice] = useState("");
 
   const loadPosts = async () => {
     try {
-      const response = await forumApi.feed();
+      const response = await forumApi.feed(user?.id);
       setPosts(response.data || []);
       
       // Initialize like counts
       const counts = {};
+      const likedIds = new Set();
       (response.data || []).forEach(post => {
         counts[post.post_id] = post.likes_count || 0;
+        if (post.user_has_liked) {
+          likedIds.add(post.post_id);
+        }
       });
+      setUserLikedPosts(likedIds);
       setPostLikeCounts(counts);
     } catch (error) {
       console.error(error);
@@ -77,27 +83,32 @@ const Forum = () => {
     }
   };
 
-  const likePost = (postId) => {
-    // Prevent double-like
-    if (userLikedPosts.has(postId) || liking[postId]) {
+  const likePost = async (postId) => {
+    if (userLikedPosts.has(postId)) {
+      setNotice("You already liked this post.");
       return;
     }
+    if (liking[postId]) return;
 
     setLiking((prev) => ({ ...prev, [postId]: true }));
-    
-    // Add to liked posts
-    setUserLikedPosts((prev) => new Set(prev).add(postId));
-    
-    // Increment like count
-    setPostLikeCounts((prev) => ({
-      ...prev,
-      [postId]: (prev[postId] || 0) + 1,
-    }));
-    
-    // Simulate API delay
-    setTimeout(() => {
+    try {
+      await forumApi.like({ post_id: postId, user_id: user.id });
+      setUserLikedPosts((prev) => new Set(prev).add(postId));
+      setPostLikeCounts((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || 0) + 1,
+      }));
+      setNotice("Thanks for liking this post.");
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || "Unable to like post.";
+      if (message.toLowerCase().includes("already")) {
+        setUserLikedPosts((prev) => new Set(prev).add(postId));
+        setNotice("You already liked this post.");
+      }
+      console.error(error);
+    } finally {
       setLiking((prev) => ({ ...prev, [postId]: false }));
-    }, 300);
+    }
   };
 
   return (
@@ -111,6 +122,8 @@ const Forum = () => {
           </p>
         </div>
       </section>
+
+      {notice && <p className="alert alert-success" style={{ margin: "24px 0" }}>{notice}</p>}
 
       <section className="grid-layout two-col" style={{ gap: 32 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

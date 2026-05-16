@@ -10,6 +10,7 @@ const Blogs = () => {
   const [mode, setMode] = useState("feed");
   const [userLikedArticles, setUserLikedArticles] = useState(new Set());
   const [liking, setLiking] = useState({});
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -18,13 +19,14 @@ const Blogs = () => {
     try {
       setLoading(true);
       const [feedResponse, bookmarksResponse] = await Promise.all([
-        blogApi.feed(),
+        blogApi.feed(user.id),
         blogApi.bookmarks(user.id)
       ]);
       
       const activeFeed = feedResponse.data || [];
       setFeed(activeFeed);
       setBookmarks(bookmarksResponse.data || []);
+      setNotice("");
       
       const likedIds = new Set();
       // In a real app, the API would return user_has_liked
@@ -46,18 +48,44 @@ const Blogs = () => {
     loadData();
   }, []);
 
+  const incrementArticleLikeCount = (articleId) => {
+    setFeed((prev) =>
+      prev.map((article) =>
+        article.article_id === articleId
+          ? { ...article, likes_count: (article.likes_count || 0) + 1 }
+          : article,
+      ),
+    );
+    setBookmarks((prev) =>
+      prev.map((article) =>
+        article.article_id === articleId
+          ? { ...article, likes_count: (article.likes_count || 0) + 1 }
+          : article,
+      ),
+    );
+  };
+
   const likeArticle = async (articleId) => {
-    if (userLikedArticles.has(articleId) || liking[articleId]) return;
+    if (userLikedArticles.has(articleId)) {
+      setNotice("You already liked this article.");
+      return;
+    }
+    if (liking[articleId]) return;
 
     setLiking((prev) => ({ ...prev, [articleId]: true }));
     try {
       await blogApi.like({ article_id: articleId, user_id: user.id });
       setUserLikedArticles((prev) => new Set(prev).add(articleId));
-      // Optionally refresh to get new like counts
+      incrementArticleLikeCount(articleId);
+      setNotice("Thanks for liking this article.");
     } catch (err) {
       console.error(err);
-      if (err?.response?.status === 400) {
+      const message = getErrorMessage(err);
+      if (message.toLowerCase().includes("already")) {
         setUserLikedArticles((prev) => new Set(prev).add(articleId));
+        setNotice("You already liked this article.");
+      } else {
+        setError(message);
       }
     } finally {
       setLiking((prev) => ({ ...prev, [articleId]: false }));
@@ -107,6 +135,7 @@ const Blogs = () => {
       </section>
 
       {error && <p className="error-banner" style={{ margin: "24px 0" }}>{error}</p>}
+      {notice && <p className="alert alert-success" style={{ margin: "24px 0" }}>{notice}</p>}
 
       {loading ? (
         <div style={{ padding: "60px 0", textAlign: "center" }}>
@@ -114,32 +143,24 @@ const Blogs = () => {
           <p className="muted" style={{ marginTop: 16 }}>Curating articles for you...</p>
         </div>
       ) : (
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", 
-          gap: 32, 
-          marginTop: 32 
-        }}>
+        <div className="blog-carousel" style={{ marginTop: 32 }}>
           {displayedArticles.length ? displayedArticles.map((article) => (
             <article 
               key={article.article_id} 
+              className="blog-card"
               style={{ 
-                background: "#fff", 
-                borderRadius: 24, 
-                border: "1px solid #e2e8f0", 
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)"
+                minWidth: 320,
+                maxWidth: 420,
+                boxShadow: "0 6px 20px rgba(15, 23, 42, 0.08)",
+                transition: "transform 0.25s ease, box-shadow 0.25s ease",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-4px)";
-                e.currentTarget.style.boxShadow = "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)";
+                e.currentTarget.style.boxShadow = "0 24px 48px rgba(15, 23, 42, 0.12)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(15, 23, 42, 0.08)";
               }}
             >
               <div style={{ height: 200, background: "#f1f5f9", position: "relative" }}>
