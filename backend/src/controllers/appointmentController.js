@@ -156,7 +156,7 @@ const bookAppointment = async (req, res) => {
             event_type: 'Appointment Booked',
             title: `Appointment scheduled for ${formatAppointmentLocal(scheduled_at)}`,
             description: reason || 'Consultation',
-            added_by: patient_user_id, 
+            added_by: patient_user_id,
             related_appointment_id: newAppointment.appointment_id,
             event_date: scheduled_at
         });
@@ -196,7 +196,7 @@ const updateStatus = async (req, res) => {
     try {
         const requestedStatus = req.body.status === 'rejected' ? 'cancelled' : req.body.status;
         const validStatuses = ['confirmed', 'completed', 'cancelled'];
-        
+
         if (!validStatuses.includes(requestedStatus)) {
             return res.status(400).json({ error: "Invalid appointment status" });
         }
@@ -220,23 +220,36 @@ const updateStatus = async (req, res) => {
         }
 
         const updatedAppointment = await Appointment.updateStatus(req.params.id, requestedStatus);
-        
+
         if (!updatedAppointment) {
             return res.status(404).json({ error: "Appointment not found" });
         }
 
         const appointmentWhen = formatAppointmentLocal(updatedAppointment.scheduled_at);
         if (requestedStatus === 'confirmed' || requestedStatus === 'cancelled') {
+            // Create notification for patient
             await Notification.createNotification({
                 user_id: updatedAppointment.patient_user_id,
                 type: 'info',
-                title: requestedStatus === 'confirmed' ? 'Appointment confirmed' : 'Appointment rejected',
+                title: requestedStatus === 'confirmed' ? 'Appointment confirmed' : 'Appointment cancelled',
                 body: requestedStatus === 'confirmed'
                     ? `Your appointment for ${appointmentWhen} has been confirmed.`
-                    : `Your appointment for ${appointmentWhen} has been rejected by the doctor.`,
+                    : `Your appointment for ${appointmentWhen} has been cancelled by the doctor.`,
                 reference_id: updatedAppointment.appointment_id,
                 reference_type: 'appointment',
             });
+
+            // If cancelling, also send notification to doctor
+            if (requestedStatus === 'cancelled') {
+                await Notification.createNotification({
+                    user_id: updatedAppointment.doctor_user_id,
+                    type: 'info',
+                    title: 'Appointment cancelled',
+                    body: `Appointment with ${updatedAppointment.patient_name || 'patient'} for ${appointmentWhen} has been cancelled.`,
+                    reference_id: updatedAppointment.appointment_id,
+                    reference_type: 'appointment',
+                });
+            }
         }
 
         // NEW: AUTOMATICALLY log the status change to the history timeline!
