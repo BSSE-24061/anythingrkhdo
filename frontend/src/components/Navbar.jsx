@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -95,6 +96,7 @@ const Navbar = () => {
       </nav>
 
       <div className="app-navbar-right">
+        <NotificationBell />
         <div className="user-chip">
           <span>{user.name?.split(" ")[0] || "User"}</span>
         </div>

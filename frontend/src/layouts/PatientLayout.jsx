@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useRef } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
 import { chatApi, vitalApi } from "../utils/apiHelper";
@@ -47,50 +47,17 @@ const DOCTOR_NAV = [
   ["Forum", "/doctor/forum"],
 ];
 
-const playAlertSound = () => {
-  try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.type = 'square';
-    
-    // Create a pulsating medical alert tone
-    for(let i=0; i<6; i++) {
-        const time = audioCtx.currentTime + i * 0.5;
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(0.05, time + 0.05);
-        gainNode.gain.linearRampToValueAtTime(0, time + 0.4);
-        
-        oscillator.frequency.setValueAtTime(600, time);
-        oscillator.frequency.exponentialRampToValueAtTime(800, time + 0.4);
-    }
-
-    oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      audioCtx.close().catch(console.error);
-    }, 3000);
-  } catch (e) {
-    console.error("Audio playback failed, possibly due to browser autoplay policies:", e);
-  }
-};
-
 const PatientLayout = ({ children }) => {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadChats, setUnreadChats] = useState(0);
   const [hasAlerts, setHasAlerts] = useState(false);
-  const prevAlertCount = useRef(0);
   const role = user?.role?.toLowerCase() || "";
 
   useEffect(() => {
     if (!user?.id) return;
-    
+
     const fetchBadges = async () => {
       try {
         const chatRes = await chatApi.inbox(user.id);
@@ -99,15 +66,7 @@ const PatientLayout = ({ children }) => {
 
         if (role === "patient") {
           const alertRes = await vitalApi.alerts(user.id);
-          const currentAlerts = alertRes.data || [];
-          const unreadAlerts = currentAlerts.filter(a => !a.is_read).length;
-          
-          if (unreadAlerts > prevAlertCount.current) {
-             playAlertSound();
-          }
-          
-          prevAlertCount.current = unreadAlerts;
-          setHasAlerts(unreadAlerts > 0);
+          setHasAlerts((alertRes.data || []).some(a => !a.is_read));
         }
       } catch (err) {
         console.error("Failed to load badges:", err);
