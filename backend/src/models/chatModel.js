@@ -142,9 +142,9 @@ const getUserRooms = async (userId) => {
     ),
     joined_data AS (
       SELECT 
-        do.other_user_id,
-        do.other_user_name,
-        do.other_user_role,
+        dothers.other_user_id,
+        dothers.other_user_name,
+        dothers.other_user_role,
         cr.room_id,
         cr.patient_user_id,
         cr.doctor_user_id,
@@ -153,11 +153,11 @@ const getUserRooms = async (userId) => {
         cr.created_at,
         cr.room_type,
         -- fallback room_type if room doesn't exist
-        (CASE WHEN do.other_user_role = 'doctor' THEN 'appointment' ELSE 'consultation' END) AS fallback_room_type
-      FROM distinct_others do
+        (CASE WHEN dothers.other_user_role = 'doctor' THEN 'appointment' ELSE 'consultation' END) AS fallback_room_type
+      FROM distinct_others dothers
       LEFT JOIN chat_rooms cr ON (
-        (cr.patient_user_id = $1 AND (cr.doctor_user_id = do.other_user_id OR cr.consultant_user_id = do.other_user_id)) OR
-        (cr.patient_user_id = do.other_user_id AND (cr.doctor_user_id = $1 OR cr.consultant_user_id = $1))
+        (cr.patient_user_id = $1 AND (cr.doctor_user_id = dothers.other_user_id OR cr.consultant_user_id = dothers.other_user_id)) OR
+        (cr.patient_user_id = dothers.other_user_id AND (cr.doctor_user_id = $1 OR cr.consultant_user_id = $1))
       )
     )
     SELECT DISTINCT ON (other_user_id)

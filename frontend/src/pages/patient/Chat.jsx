@@ -95,7 +95,7 @@ const Chat = () => {
           consultant_user_id: selectedRoom.consultant_user_id,
           room_type: selectedRoom.room_type || "appointment"
         });
-        roomId = createRes.data.room_id;
+        roomId = createRes.data.room.room_id;
         // Update selection and search params to the new real room_id
         setCurrentSelection(roomId);
         setSearchParams({ room: roomId });

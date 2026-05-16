@@ -183,7 +183,7 @@ const Chat = () => {
             {inboxRooms.length ? inboxRooms.map((room) => (
               <div className={`list-item chat-row ${room.room_id === currentRoomId ? "active" : ""}`} key={room.room_id}>
                 <div>
-                  <strong>{room.patient_name || room.consultant_name || "Chat"}</strong>
+                  <strong>{room.other_user_name || "User"}</strong>
                   <span>Unread: {room.unread_count || 0}</span>
                 </div>
                 <button className="btn-main small" onClick={() => openRoom(room.room_id)}>Open</button>
@@ -193,7 +193,7 @@ const Chat = () => {
         </div>
 
         <div className="card doctor-chat-panel">
-          <div className="section-heading"><h3>{selectedRoom ? selectedRoom.patient_name || "Conversation" : "Conversation"}</h3></div>
+          <div className="section-heading"><h3>{selectedRoom ? selectedRoom.other_user_name || "Conversation" : "Conversation"}</h3></div>
           <div className="chat-box">
             {messages.length ? messages.map((message) => (
               <div className={`chat-bubble ${message.sender_id === user.id ? "me" : ""}`} key={message.message_id}>
