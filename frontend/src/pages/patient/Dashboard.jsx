@@ -92,6 +92,7 @@ const PatientDashboard = () => {
     .slice(0, 2);
 
   const todaysMedications = medicationLogs.slice(0, 4);
+  const unreadAlertsCount = alerts.filter(a => !a.is_read).length;
 
   const nextAppointment = appointments
     .filter((apt) => apt.status !== "completed" && apt.status !== "cancelled" && new Date(apt.scheduled_at) > new Date())
@@ -197,7 +198,7 @@ const PatientDashboard = () => {
         >
           <div>
             <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Unread Alerts</div>
-            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unread}</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unreadAlertsCount}</div>
           </div>
           <div style={{ color: "#2563eb", fontWeight: 900 }}>🔔</div>
         </div>

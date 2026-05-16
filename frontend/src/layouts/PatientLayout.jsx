@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
+import { chatApi, vitalApi } from "../utils/apiHelper";
 
 const PATIENT_NAV = [
   ["Dashboard", "/patient/dashboard"],
@@ -50,6 +51,32 @@ const PatientLayout = ({ children }) => {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadChats, setUnreadChats] = useState(0);
+  const [hasAlerts, setHasAlerts] = useState(false);
+  const role = user?.role?.toLowerCase() || "";
+
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchBadges = async () => {
+      try {
+        const chatRes = await chatApi.inbox(user.id);
+        const unreadRooms = (chatRes.data || []).filter(r => r.unread_count > 0).length;
+        setUnreadChats(unreadRooms);
+
+        if (role === "patient") {
+          const alertRes = await vitalApi.alerts(user.id);
+          setHasAlerts((alertRes.data || []).some(a => !a.is_read));
+        }
+      } catch (err) {
+        console.error("Failed to load badges:", err);
+      }
+    };
+
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 15000);
+    return () => clearInterval(interval);
+  }, [user?.id, role]);
 
   const handleLogout = () => {
     clearSession();
@@ -58,7 +85,6 @@ const PatientLayout = ({ children }) => {
 
   if (!user) return null;
 
-  const role = user.role?.toLowerCase() || "";
   let navItems = PATIENT_NAV;
   if (role === "admin") navItems = ADMIN_NAV;
   else if (role === "consultant") navItems = CONSULTANT_NAV;
@@ -164,9 +190,20 @@ const PatientLayout = ({ children }) => {
                     height: 10,
                     borderRadius: 999,
                     background: active ? "#2563eb" : "#cbd5e1",
+                    flexShrink: 0,
                   }}
                 />
-                {label}
+                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+                {label === "Chat" && unreadChats > 0 && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    {unreadChats}
+                  </span>
+                )}
+                {label === "Alerts" && role === "patient" && hasAlerts && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    !
+                  </span>
+                )}
               </Link>
             );
           })}

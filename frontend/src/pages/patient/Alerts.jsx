@@ -14,6 +14,11 @@ const Alerts = () => {
       setLoading(true);
       const response = await vitalApi.alerts(user.id);
       setAlerts(response.data || []);
+
+      const hasUnread = (response.data || []).some(a => !a.is_read);
+      if (hasUnread) {
+        vitalApi.markAlertsRead(user.id).catch(console.error);
+      }
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load health alerts."));
     } finally {

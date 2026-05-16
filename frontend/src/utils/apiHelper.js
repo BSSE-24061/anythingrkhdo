@@ -48,6 +48,7 @@ export const vitalApi = {
   getByPatient: (patientId) => api.get(`/vitals/patient/${patientId}`),
   alerts: (patientId) => api.get(`/vitals/alerts/${patientId}`),
   getAlerts: (patientId) => api.get(`/vitals/alerts/${patientId}`),
+  markAlertsRead: (patientId) => api.patch(`/vitals/alerts/${patientId}/read`),
 };
 
 export const prescriptionApi = {

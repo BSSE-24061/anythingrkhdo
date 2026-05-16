@@ -162,7 +162,10 @@ const Chat = () => {
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div className="muted" style={{ fontSize: 12 }}>{room.room_type || "consultation"}</div>
-                    {!room.room_id && <span style={{ fontSize: 10, background: "rgba(37, 99, 235, 0.1)", color: "#2563eb", padding: "2px 6px", borderRadius: 4, fontWeight: 800 }}>New</span>}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {!room.room_id && <span style={{ fontSize: 10, background: "rgba(37, 99, 235, 0.1)", color: "#2563eb", padding: "2px 6px", borderRadius: 4, fontWeight: 800 }}>New</span>}
+                      {room.unread_count > 0 && <span style={{ fontSize: 10, background: "#ef4444", color: "#fff", padding: "2px 6px", borderRadius: 10, fontWeight: 900 }}>{room.unread_count}</span>}
+                    </div>
                   </div>
                 </div>
               </div>
