@@ -15,6 +15,13 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const getDisplayName = (room) => {
+    if (user?.role === "consultant") {
+      return room.patient_name || room.other_user_name || "Patient";
+    }
+    return room.doctor_name ? `Dr. ${room.doctor_name}` : room.consultant_name || room.other_user_name || "Specialist";
+  };
+
   // Map rooms to a consistent structure
   const inboxRooms = useMemo(() => {
     return rooms.map(r => ({
@@ -147,11 +154,11 @@ const Chat = () => {
                 }}
               >
                 <div style={{ width: 44, height: 44, borderRadius: "50%", background: room.uniqueId === currentSelection ? "#14b8a6" : "#2563eb", color: "#fff", display: "grid", placeItems: "center", fontWeight: 900, fontSize: 18 }}>
-                  {(room.other_user_name)?.[0] || "U"}
+                  {(room.other_user_name || room.patient_name || room.doctor_name || room.consultant_name || "P")[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 900, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {room.other_user_role === 'doctor' ? `Dr. ${room.other_user_name}` : room.other_user_name || "User"}
+                    {getDisplayName(room)}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div className="muted" style={{ fontSize: 12 }}>{room.room_type || "consultation"}</div>
@@ -162,7 +169,7 @@ const Chat = () => {
             )) : (
               <div style={{ padding: 40, textAlign: "center" }}>
                 <p className="muted">No chats found.</p>
-                <p className="muted" style={{ fontSize: 12 }}>No messages available.</p>
+                <p className="muted" style={{ fontSize: 12 }}>Book an appointment to start chatting.</p>
               </div>
             )}
           </div>
@@ -175,7 +182,7 @@ const Chat = () => {
               <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ fontWeight: 900, fontSize: "1.2rem" }}>
-                    {selectedRoom.other_user_role === 'doctor' ? `Dr. ${selectedRoom.other_user_name}` : selectedRoom.other_user_name || "User"}
+                    {getDisplayName(selectedRoom)}
                   </div>
                   {selectedRoom.chat_active && <span className="status-pill status-open" style={{ fontSize: 10, background: "#dcfce7", color: "#166534" }}>Active Session</span>}
                 </div>
@@ -208,7 +215,7 @@ const Chat = () => {
                    <div style={{ flex: 1, display: "grid", placeItems: "center", opacity: 0.5 }}>
                       <div style={{ textAlign: "center" }}>
                         <div style={{ fontSize: 40, marginBottom: 12 }}>🤝</div>
-                        <p style={{ margin: 0, fontWeight: 800 }}>Start your conversation with {selectedRoom.other_user_name}</p>
+                        <p style={{ margin: 0, fontWeight: 800 }}>Start your conversation with {getDisplayName(selectedRoom)}</p>
                       </div>
                    </div>
                 )}
