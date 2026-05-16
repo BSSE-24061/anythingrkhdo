@@ -41,7 +41,7 @@ const PatientDashboard = () => {
   const [forumPosts, setForumPosts] = useState([]);
 
   useEffect(() => {
-    const load = async () => {
+    const loadUnread = async () => {
       if (!user?.id) return;
       try {
         const unreadResponse = await notificationApi.unreadCount(user.id);
@@ -50,13 +50,9 @@ const PatientDashboard = () => {
         setUnread(0);
       }
     };
-    load();
-  }, [user]);
 
-  useEffect(() => {
     const loadPatientData = async () => {
       if (!user?.id) return;
-
       try {
         const appointmentsResponse = await appointmentApi.byPatient(user.id);
         setAppointments(appointmentsResponse.data || []);
@@ -80,7 +76,14 @@ const PatientDashboard = () => {
       }
     };
 
-    loadPatientData();
+    const loadAll = () => {
+      loadUnread();
+      loadPatientData();
+    };
+
+    loadAll();
+    const interval = setInterval(loadAll, 15000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const activeMedications = medicationLogs.filter((log) => log.status === "active");

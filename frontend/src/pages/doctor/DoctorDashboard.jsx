@@ -1,165 +1,170 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { appointmentApi, notificationApi, vitalApi } from "../../utils/apiHelper";
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
 import { formatIslamabadDateTime } from "../../utils/dateTime";
 
+const STATUS_PILL_STYLES = {
+  confirmed: {
+    background: "rgba(59, 130, 246, 0.12)",
+    color: "#1d4ed8",
+  },
+  pending: {
+    background: "rgba(245, 158, 11, 0.14)",
+    color: "#b45309",
+  },
+  completed: {
+    background: "rgba(34, 197, 94, 0.14)",
+    color: "#15803d",
+  },
+  cancelled: {
+    background: "rgba(239, 68, 68, 0.14)",
+    color: "#b91c1c",
+  },
+};
+
 const DoctorDashboard = () => {
-  const user = getStoredUser();
+  const user = useMemo(() => getStoredUser(), []);
   const userId = user?.id;
   const [stats, setStats] = useState({ appointments: [], patients: [], alerts: [], notifications: [] });
-  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    if (!userId) return;
+    try {
+      const [appointmentsRes, alertsRes, notificationsRes] = await Promise.all([
+        appointmentApi.byDoctor(userId),
+        vitalApi.alerts(userId),
+        notificationApi.list(userId),
+      ]);
+
+      const appointments = appointmentsRes.data || [];
+      setStats({
+        appointments,
+        patients: patientsFromAppointments(appointments),
+        alerts: alertsRes.data || [],
+        notifications: notificationsRes.data || [],
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      if (!userId) return;
-      setLoading(true);
-      try {
-        const [appointmentsRes, alertsRes, notificationsRes] = await Promise.all([
-          appointmentApi.byDoctor(userId),
-          vitalApi.alerts(userId),
-          notificationApi.list(userId),
-        ]);
-
-        const appointments = appointmentsRes.data || [];
-        setStats({
-          appointments,
-          patients: patientsFromAppointments(appointments),
-          alerts: alertsRes.data || [],
-          notifications: notificationsRes.data || [],
-        });
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, [userId]);
 
   const upcoming = stats.appointments.filter((item) => item.status !== "completed").slice(0, 5);
   const unreadNotifications = stats.notifications.filter((n) => !n.is_read).length;
 
+  if (!user) return null;
+
   return (
-    <>
+    <div style={{ display: "grid", gap: 16 }}>
       {/* Header */}
-      <section className="page-heading">
-        <div>
-          <h1>Good morning, Dr. {user?.name || "Doctor"}!</h1>
-          <p className="muted">Track appointments, patient activity, and important alerts</p>
-        </div>
-      </section>
+      <div>
+        <h1 style={{ fontSize: 32, margin: 0, color: "#0f172a", letterSpacing: "-0.02em" }}>
+          Good morning, Dr. {user.name || "Doctor"}!
+        </h1>
+        <p style={{ margin: "8px 0 0", color: "#64748b", fontWeight: 600, fontSize: 18 }}>
+          Track appointments, patient activity, and important alerts
+        </p>
+      </div>
 
-      {/* Stats Cards */}
-      <section className="doctor-stats">
-        <div className="stat-card">
-          <p>Appointments</p>
-          <strong>{loading ? "..." : stats.appointments.length}</strong>
-        </div>
-        <div className="stat-card">
-          <p>Patients</p>
-          <strong>{loading ? "..." : stats.patients.length}</strong>
-        </div>
-        <div className="stat-card">
-          <p>Alerts</p>
-          <strong>{loading ? "..." : stats.alerts.length}</strong>
-        </div>
-        <div className="stat-card">
-          <p>Notifications</p>
-          <strong>{loading ? "..." : unreadNotifications}</strong>
-        </div>
-      </section>
-
-      {/* Main Content - Two Column Layout */}
-      <section className="grid-layout two-col">
-        {/* Left - Upcoming Appointments */}
-        <div className="card">
-          <div className="section-heading">
-            <h3>Upcoming Appointments</h3>
+      {/* Stats Row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 14,
+        }}
+      >
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Appointments</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{stats.appointments.length}</div>
           </div>
-          {upcoming.length ? (
-            <div className="list-stack">
-              {upcoming.map((appointment) => (
-                <div className="list-item" key={appointment.appointment_id}>
-                  <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between" }}>
-                    <div>
-                      <strong style={{ display: "block", marginBottom: "4px" }}>
-                        {appointment.patient_name || "Patient"}
-                      </strong>
-                      <span className="muted" style={{ fontSize: "0.9rem" }}>
-                        {formatIslamabadDateTime(appointment.scheduled_at)}
-                      </span>
-                      <p style={{ margin: "8px 0 0 0", fontSize: "0.9rem" }}>
-                        {appointment.reason || "No reason provided"}
-                      </p>
+          <div style={{ color: "#2563eb", fontWeight: 900 }}>📅</div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Patients</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{stats.patients.length}</div>
+          </div>
+          <div style={{ color: "#2563eb", fontWeight: 900 }}>👥</div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Alerts</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{stats.alerts.length}</div>
+          </div>
+          <div style={{ color: "#2563eb", fontWeight: 900 }}>⚠️</div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Notifications</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unreadNotifications}</div>
+          </div>
+          <div style={{ color: "#2563eb", fontWeight: 900 }}>🔔</div>
+        </div>
+      </div>
+
+      {/* Content Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16 }}>
+        {/* Left Column */}
+        <div style={{ display: "grid", gap: 16 }}>
+          <section style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 16, padding: 18 }}>
+            <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18, fontWeight: 900 }}>Upcoming Appointments</h3>
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              {upcoming.length > 0 ? (
+                upcoming.map((appointment) => (
+                  <div key={appointment.appointment_id} style={{ border: "1px solid #e6edf5", borderRadius: 14, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.22)", display: "grid", placeItems: "center", color: "#2563eb", fontWeight: 900 }}>👤</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 13 }}>{appointment.patient_name || "Patient"}</div>
+                        <div style={{ color: "#64748b", fontWeight: 700, fontSize: 12 }}>{appointment.reason || "No reason provided"}</div>
+                        <div style={{ color: "#94a3b8", fontWeight: 800, fontSize: 11, marginTop: 6 }}>{formatIslamabadDateTime(appointment.scheduled_at)}</div>
+                      </div>
                     </div>
-                    <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        fontSize: "0.75rem",
-                        fontWeight: "700",
-                        background: appointment.status === "confirmed" 
-                          ? "rgba(34, 197, 94, 0.15)" 
-                          : "rgba(243, 156, 18, 0.15)",
-                        color: appointment.status === "confirmed" 
-                          ? "var(--success)" 
-                          : "var(--warning)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {appointment.status}
-                    </span>
+                    <span style={{ padding: "6px 10px", borderRadius: 999, fontWeight: 900, fontSize: 11, ...(STATUS_PILL_STYLES[appointment.status] || STATUS_PILL_STYLES.pending) }}>{appointment.status || "pending"}</span>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>No upcoming appointments</div>
+              )}
             </div>
-          ) : (
-            <p className="muted">No upcoming appointments.</p>
-          )}
+          </section>
         </div>
 
-        {/* Right - Recent Alerts */}
-        <div className="card">
-          <div className="section-heading">
-            <h3>Recent Alerts</h3>
-          </div>
-          {stats.alerts.length ? (
-            <div className="list-stack">
-              {stats.alerts.slice(0, 5).map((alert) => (
-                <div className="list-item" key={alert.alert_id}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "start" }}>
-                    <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>⚠️</span>
+        {/* Right Column */}
+        <div style={{ display: "grid", gap: 16 }}>
+          <section style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 16, padding: 18, height: "fit-content", position: "sticky", top: 20 }}>
+            <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18, fontWeight: 900 }}>Recent Alerts</h3>
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              {stats.alerts.length > 0 ? (
+                stats.alerts.slice(0, 5).map((alert) => (
+                  <div key={alert.alert_id} style={{ border: "1px solid #e6edf5", borderRadius: 14, padding: 12, background: "#fff", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <div style={{ fontSize: 18, lineHeight: 1 }}>⚠️</div>
                     <div style={{ minWidth: 0 }}>
-                      <strong style={{ display: "block" }}>{alert.alert_type}</strong>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          background: "rgba(243, 156, 18, 0.15)",
-                          color: "var(--warning)",
-                          display: "inline-block",
-                          marginTop: "4px",
-                        }}
-                      >
-                        {alert.severity}
-                      </span>
-                      <p className="muted" style={{ margin: "6px 0 0 0", fontSize: "0.85rem" }}>
-                        {alert.message}
-                      </p>
+                      <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 13 }}>{alert.alert_type}</div>
+                      <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12, marginTop: 4 }}>{alert.message}</div>
+                      <div style={{ color: "#94a3b8", fontWeight: 800, fontSize: 11, marginTop: 6 }}>{alert.severity}</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>No recent alerts</div>
+              )}
             </div>
-          ) : (
-            <p className="muted">No alerts yet.</p>
-          )}
+          </section>
         </div>
-      </section>
-    </>
+      </div>
+    </div>
   );
 };
 

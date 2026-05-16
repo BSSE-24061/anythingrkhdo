@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
 
-const NAV = [
+const PATIENT_NAV = [
   ["Dashboard", "/patient/dashboard"],
   ["Alerts", "/alerts"],
   ["Appointments", "/appointments"],
@@ -14,6 +14,36 @@ const NAV = [
   ["Forum", "/forum"],
   ["Chat", "/chat"],
   ["Consultant", "/consultant"],
+];
+
+const ADMIN_NAV = [
+  ["Dashboard", "/admin/dashboard"],
+  ["Blogs", "/blogs"],
+  ["Forum", "/forum"],
+  ["Blog Approval", "/admin/blog-approval"],
+  ["Comment Moderation", "/admin/comment-moderation"],
+  ["Create Blog", "/admin/create-blog"],
+];
+
+const CONSULTANT_NAV = [
+  ["Dashboard", "/consultant/dashboard"],
+  ["Chat", "/chat"],
+  ["Blogs", "/blogs"],
+  ["Forum", "/forum"],
+];
+
+const DOCTOR_NAV = [
+  ["Dashboard", "/doctor/dashboard"],
+  ["Appointments", "/doctor/appointments"],
+  ["Vitals", "/doctor/vitals"],
+  ["Patients", "/doctor/patients"],
+  ["Prescriptions", "/doctor/prescriptions"],
+  ["Medication Logs", "/doctor/medication-logs"],
+  ["Medical History", "/doctor/history"],
+  ["Availability", "/doctor/availability"],
+  ["Chat", "/doctor/chat"],
+  ["Blogs", "/doctor/blogs"],
+  ["Forum", "/doctor/forum"],
 ];
 
 const PatientLayout = ({ children }) => {
@@ -28,6 +58,12 @@ const PatientLayout = ({ children }) => {
 
   if (!user) return null;
 
+  const role = user.role?.toLowerCase() || "";
+  let navItems = PATIENT_NAV;
+  if (role === "admin") navItems = ADMIN_NAV;
+  else if (role === "consultant") navItems = CONSULTANT_NAV;
+  else if (role === "doctor") navItems = DOCTOR_NAV;
+
   return (
     <div
       className="patient-theme"
@@ -37,7 +73,7 @@ const PatientLayout = ({ children }) => {
         display: "flex",
       }}
     >
-      {/* Left Sidebar (screenshot-like theme) */}
+      {/* Left Sidebar */}
       <aside
         style={{
           width: 248,
@@ -81,9 +117,10 @@ const PatientLayout = ({ children }) => {
                 letterSpacing: "0.12em",
                 color: "#64748b",
                 fontWeight: 800,
+                textTransform: "uppercase"
               }}
             >
-              PATIENT
+              {role}
             </div>
           </div>
         </div>
@@ -97,10 +134,10 @@ const PatientLayout = ({ children }) => {
             marginTop: 8,
           }}
         >
-          {NAV.map(([label, path]) => {
+          {navItems.map(([label, path]) => {
             const active =
               location.pathname === path ||
-              (path !== "/patient/dashboard" &&
+              (path !== `/${role}/dashboard` &&
                 location.pathname.startsWith(path));
             return (
               <Link
@@ -155,7 +192,7 @@ const PatientLayout = ({ children }) => {
               textTransform: "uppercase",
             }}
           >
-            Patient
+            {role}
           </div>
           <div
             style={{
@@ -165,7 +202,7 @@ const PatientLayout = ({ children }) => {
               fontSize: 14,
             }}
           >
-            {user.name || "Patient"}
+            {user.name || "User"}
           </div>
 
           <button
