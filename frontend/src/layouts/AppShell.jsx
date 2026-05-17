@@ -27,11 +27,13 @@ const AppShell = ({ children }) => {
 
   useEffect(() => {
     if (!user?.id) return;
-    
+
     const fetchBadges = async () => {
       try {
         const chatRes = await chatApi.inbox(user.id);
-        const unreadRooms = (chatRes.data || []).filter(r => r.unread_count > 0).length;
+        const unreadRooms = (chatRes.data || []).filter(
+          (r) => r.unread_count > 0,
+        ).length;
         setUnreadChats(unreadRooms);
       } catch (err) {
         console.error("Failed to load badges:", err);
@@ -51,7 +53,8 @@ const AppShell = ({ children }) => {
   if (!user) return null;
 
   const role = user.role?.toLowerCase() || "";
-  const navItems = role === "admin" ? ADMIN_NAV : role === "consultant" ? CONSULTANT_NAV : [];
+  const navItems =
+    role === "admin" ? ADMIN_NAV : role === "consultant" ? CONSULTANT_NAV : [];
 
   return (
     <div
@@ -100,7 +103,7 @@ const AppShell = ({ children }) => {
                 letterSpacing: "0.12em",
                 color: "#64748b",
                 fontWeight: 800,
-                textTransform: "uppercase"
+                textTransform: "uppercase",
               }}
             >
               {role}
@@ -134,7 +137,9 @@ const AppShell = ({ children }) => {
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
-                  background: active ? "rgba(37, 99, 235, 0.08)" : "transparent",
+                  background: active
+                    ? "rgba(37, 99, 235, 0.08)"
+                    : "transparent",
                   border: active
                     ? "1px solid rgba(37, 99, 235, 0.25)"
                     : "1px solid transparent",
@@ -149,9 +154,29 @@ const AppShell = ({ children }) => {
                     flexShrink: 0,
                   }}
                 />
-                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+                <span
+                  style={{
+                    flex: 1,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {label}
+                </span>
                 {label === "Chat" && unreadChats > 0 && (
-                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                  <span
+                    style={{
+                      background: "#ef4444",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 900,
+                      padding: "2px 6px",
+                      borderRadius: 10,
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
                     {unreadChats}
                   </span>
                 )}
@@ -212,7 +237,17 @@ const AppShell = ({ children }) => {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: 24 }}>{children}</main>
+      <main
+        style={{
+          flex: 1,
+          padding: 24,
+          overflow: "auto",
+          maxWidth: "calc(100vw - 248px)",
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 };

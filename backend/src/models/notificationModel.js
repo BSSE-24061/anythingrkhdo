@@ -25,12 +25,17 @@ const sendNotificationEmail = async (userId, title, body, type) => {
     const htmlContent = generateEmailTemplate(title, body, type, full_name);
 
     // Send email
-    const emailSent = await sendEmail(email, subject, body || title, htmlContent);
+    const emailSent = await sendEmail(
+      email,
+      subject,
+      body || title,
+      htmlContent,
+    );
     return emailSent;
   } catch (error) {
     console.error(
       `Error sending email notification for user ${userId}:`,
-      error.message
+      error.message,
     );
     return false; // Don't let email errors break notification creation
   }

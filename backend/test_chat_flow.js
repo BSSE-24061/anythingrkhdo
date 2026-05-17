@@ -83,9 +83,9 @@ async function runTests() {
       console.log(`[✓] Doctor sees Patient in inbox: ${pRoomInDoctor.other_user_name}`);
     }
 
-    console.log("\n✅ All chat feature tests passed successfully!");
+    console.log("\n All chat feature tests passed successfully!");
   } catch (error) {
-    console.error("\n❌ Test Failed:", error.message);
+    console.error("\n Test Failed:", error.message);
     console.error(error);
   } finally {
     process.exit(0);

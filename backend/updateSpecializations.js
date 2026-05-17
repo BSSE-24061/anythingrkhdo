@@ -25,7 +25,7 @@ const updateSpecializations = async () => {
       );
       console.log(`Updated ${name} to ${spec} (${result.rowCount} rows affected)`);
     }
-    console.log('✓ All specializations updated successfully');
+    console.log(' All specializations updated successfully');
     process.exit(0);
   } catch (error) {
     console.error('Error updating specializations:', error);

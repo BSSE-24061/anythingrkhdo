@@ -16,10 +16,10 @@ const pool = new Pool({
 async function testConnection() {
   try {
     const res = await pool.query("SELECT NOW()");
-    console.log("✅ Database connected successfully!");
+    console.log(" Database connected successfully!");
     console.log("Time from DB:", res.rows[0]);
   } catch (err) {
-    console.error("❌ Connection failed:", err.message);
+    console.error(" Connection failed:", err.message);
   } finally {
     await pool.end();
   }
