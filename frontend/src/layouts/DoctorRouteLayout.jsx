@@ -1,0 +1,222 @@
+import { useMemo, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { clearSession, getStoredUser } from "../utils/session";
+import { chatApi } from "../utils/apiHelper";
+import NotificationBell from "../components/NotificationBell";
+
+const DOCTOR_NAV = [
+  ["Dashboard", "/doctor/dashboard"],
+  ["Appointments", "/doctor/appointments"],
+  ["Vitals", "/doctor/vitals"],
+  ["Patients", "/doctor/patients"],
+  ["Prescriptions", "/doctor/prescriptions"],
+  ["Medication Logs", "/doctor/medication-logs"],
+  ["Medical History", "/doctor/history"],
+  ["Availability", "/doctor/availability"],
+  ["Chat", "/doctor/chat"],
+  ["Blogs", "/doctor/blogs"],
+  ["Forum", "/doctor/forum"],
+];
+
+const DoctorRouteLayout = () => {
+  const user = useMemo(() => getStoredUser(), []);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchBadges = async () => {
+      try {
+        const chatRes = await chatApi.inbox(user.id);
+        const unreadRooms = (chatRes.data || []).filter(r => r.unread_count > 0).length;
+        setUnreadChats(unreadRooms);
+      } catch (err) {
+        console.error("Failed to load badges:", err);
+      }
+    };
+
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 15000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  const handleLogout = () => {
+    clearSession();
+    navigate("/login");
+  };
+
+  if (!user) return null;
+
+  return (
+    <div
+      className="patient-theme"
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        display: "flex",
+      }}
+    >
+      <aside
+        style={{
+          width: 248,
+          background: "#ffffff",
+          borderRight: "1px solid #e6edf5",
+          padding: 18,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img
+            src="/small%20logo.png"
+            alt="MediCare logo"
+            style={{
+              height: 34,
+              width: "auto",
+              objectFit: "contain",
+              borderRadius: 6,
+            }}
+          />
+          <div style={{ lineHeight: 1.1 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14 }}>
+              MediCare
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.12em",
+                color: "#64748b",
+                fontWeight: 800,
+              }}
+            >
+              DOCTOR
+            </div>
+          </div>
+        </div>
+
+        <nav
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            marginTop: 8,
+          }}
+        >
+          {DOCTOR_NAV.map(([label, path]) => {
+            const active =
+              location.pathname === path ||
+              (path !== "/doctor/dashboard" &&
+                location.pathname.startsWith(path));
+            return (
+              <Link
+                key={path + label}
+                to={path}
+                style={{
+                  padding: "12px 12px",
+                  borderRadius: 12,
+                  color: active ? "#1d4ed8" : "#334155",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  background: active ? "rgba(37, 99, 235, 0.08)" : "transparent",
+                  border: active
+                    ? "1px solid rgba(37, 99, 235, 0.25)"
+                    : "1px solid transparent",
+                }}
+              >
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    background: active ? "#2563eb" : "#cbd5e1",
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+                {label === "Chat" && unreadChats > 0 && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    {unreadChats}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div style={{ flex: 1 }} />
+
+        <div
+          style={{
+            border: "1px solid #e6edf5",
+            borderRadius: 16,
+            padding: 12,
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              color: "#64748b",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Doctor
+          </div>
+          <div
+            style={{
+              fontWeight: 900,
+              color: "#0f172a",
+              marginTop: 6,
+              fontSize: 14,
+            }}
+          >
+            {user.name || "Doctor"}
+          </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              marginTop: 12,
+              width: "100%",
+              padding: "10px",
+              borderRadius: 12,
+              border: "1px solid #fee2e2",
+              background: "#fef2f2",
+              color: "#dc2626",
+              fontWeight: 800,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Log Out
+          </button>
+        </div>
+      </aside>
+
+      <main style={{ flex: 1, padding: "24px 32px", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 999, border: "1px solid #e2e8f0", padding: 4, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+            <NotificationBell />
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default DoctorRouteLayout;

@@ -78,22 +78,18 @@ const AppShell = ({ children }) => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
+          <img
+            src="/small%20logo.png"
+            alt="MediCare logo"
             style={{
               width: 34,
               height: 34,
               borderRadius: 10,
-              background: "#2563eb",
-              color: "#fff",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 900,
-              fontSize: 16,
+              objectFit: "contain",
+              background: "#fff",
               boxShadow: "0 8px 20px rgba(37, 99, 235, 0.25)",
             }}
-          >
-            ✓
-          </div>
+          />
           <div style={{ lineHeight: 1.1 }}>
             <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14 }}>
               MediCare

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { blogApi, forumApi } from "../../utils/apiHelper";
-import { getStoredUser } from "../../utils/session";
+import { blogApi, forumApi } from "../utils/apiHelper";
+import { getStoredUser } from "../utils/session";
 
 const Community = () => {
   const user = useMemo(() => getStoredUser(), []);
@@ -15,8 +15,8 @@ const Community = () => {
     try {
       setError("");
       const [forumRes, blogRes] = await Promise.all([
-        forumApi.feed(user?.id),
-        blogApi.feed(user?.id),
+        forumApi.feed(),
+        blogApi.feed(),
       ]);
       setForumPosts(forumRes.data);
       setBlogs(blogRes.data);

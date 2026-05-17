@@ -28,6 +28,8 @@ const getArticles = async (userId = null) => {
   const query = `
         SELECT ba.*, u.full_name AS author_name, u.specialization,
                COALESCE(like_counts.likes_count, 0) AS likes_count,
+               COALESCE(comment_counts.comments_count, 0) AS comments_count,
+               COALESCE(comment_preview.comments, '[]'::json) AS comments,
                EXISTS(
                  SELECT 1 FROM article_likes al
                  WHERE al.article_id = ba.article_id
@@ -40,6 +42,22 @@ const getArticles = async (userId = null) => {
           FROM article_likes
           GROUP BY article_id
         ) AS like_counts ON like_counts.article_id = ba.article_id
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS comments_count
+          FROM article_comments
+          GROUP BY article_id
+        ) AS comment_counts ON comment_counts.article_id = ba.article_id
+        LEFT JOIN LATERAL (
+          SELECT json_agg(row_to_json(comment_row) ORDER BY comment_row.created_at ASC) AS comments
+          FROM (
+            SELECT ac.comment_id, ac.article_id, ac.user_id, ac.body, ac.created_at,
+                   cu.full_name AS commenter_name, cu.role AS commenter_role
+            FROM article_comments ac
+            JOIN users cu ON ac.user_id = cu.user_id
+            WHERE ac.article_id = ba.article_id
+            ORDER BY ac.created_at ASC
+          ) AS comment_row
+        ) AS comment_preview ON true
         WHERE ba.status = 'active'
         ORDER BY ba.published_at DESC;
     `;
@@ -51,6 +69,8 @@ const getPendingArticles = async (userId = null) => {
   const query = `
         SELECT ba.*, u.full_name AS author_name, u.specialization,
                COALESCE(like_counts.likes_count, 0) AS likes_count,
+               COALESCE(comment_counts.comments_count, 0) AS comments_count,
+               COALESCE(comment_preview.comments, '[]'::json) AS comments,
                EXISTS(
                  SELECT 1 FROM article_likes al
                  WHERE al.article_id = ba.article_id
@@ -63,10 +83,26 @@ const getPendingArticles = async (userId = null) => {
           FROM article_likes
           GROUP BY article_id
         ) AS like_counts ON like_counts.article_id = ba.article_id
-        WHERE ba.status = 'hidden'
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS comments_count
+          FROM article_comments
+          GROUP BY article_id
+        ) AS comment_counts ON comment_counts.article_id = ba.article_id
+        LEFT JOIN LATERAL (
+          SELECT json_agg(row_to_json(comment_row) ORDER BY comment_row.created_at ASC) AS comments
+          FROM (
+            SELECT ac.comment_id, ac.article_id, ac.user_id, ac.body, ac.created_at,
+                   cu.full_name AS commenter_name, cu.role AS commenter_role
+            FROM article_comments ac
+            JOIN users cu ON ac.user_id = cu.user_id
+            WHERE ac.article_id = ba.article_id
+            ORDER BY ac.created_at ASC
+          ) AS comment_row
+        ) AS comment_preview ON true
+        WHERE ba.status = 'hidden' AND ($1::uuid IS NULL OR ba.author_user_id = $1)
         ORDER BY ba.created_at DESC;
     `;
-  const result = await db.query(query, [userId]);
+  const result = await db.query(query, [userId || null]);
   return result.rows;
 };
 
@@ -74,9 +110,14 @@ const addComment = async (commentData) => {
   const { article_id, user_id, body } = commentData;
 
   const query = `
-        INSERT INTO article_comments (article_id, user_id, body)
-        VALUES ($1, $2, $3)
-        RETURNING *;
+        WITH inserted_comment AS (
+          INSERT INTO article_comments (article_id, user_id, body)
+          VALUES ($1, $2, $3)
+          RETURNING *
+        )
+        SELECT ic.*, u.full_name AS commenter_name, u.role AS commenter_role
+        FROM inserted_comment ic
+        JOIN users u ON ic.user_id = u.user_id;
     `;
 
   const result = await db.query(query, [article_id, user_id, body]);
@@ -128,6 +169,9 @@ const removeBookmark = async (articleId, userId) => {
 const getUserBookmarks = async (userId) => {
   const query = `
         SELECT ba.*, u.full_name AS author_name, u.specialization,
+               COALESCE(like_counts.likes_count, 0) AS likes_count,
+               COALESCE(comment_counts.comments_count, 0) AS comments_count,
+               COALESCE(comment_preview.comments, '[]'::json) AS comments,
                EXISTS(
                  SELECT 1 FROM article_likes al
                  WHERE al.article_id = ba.article_id
@@ -137,6 +181,27 @@ const getUserBookmarks = async (userId) => {
         FROM article_bookmarks ab
         JOIN blog_articles ba ON ab.article_id = ba.article_id
         JOIN users u ON ba.author_user_id = u.user_id
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS likes_count
+          FROM article_likes
+          GROUP BY article_id
+        ) AS like_counts ON like_counts.article_id = ba.article_id
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS comments_count
+          FROM article_comments
+          GROUP BY article_id
+        ) AS comment_counts ON comment_counts.article_id = ba.article_id
+        LEFT JOIN LATERAL (
+          SELECT json_agg(row_to_json(comment_row) ORDER BY comment_row.created_at ASC) AS comments
+          FROM (
+            SELECT ac.comment_id, ac.article_id, ac.user_id, ac.body, ac.created_at,
+                   cu.full_name AS commenter_name, cu.role AS commenter_role
+            FROM article_comments ac
+            JOIN users cu ON ac.user_id = cu.user_id
+            WHERE ac.article_id = ba.article_id
+            ORDER BY ac.created_at ASC
+          ) AS comment_row
+        ) AS comment_preview ON true
         WHERE ab.user_id = $1 AND ba.status = 'active'
         ORDER BY ab.created_at DESC;
     `;

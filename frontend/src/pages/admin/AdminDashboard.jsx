@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { notificationApi, userApi } from "../../utils/apiHelper";
+import { notificationApi, userApi, medicationApi } from "../../utils/apiHelper";
 import { getStoredUser } from "../../utils/session";
 import AppShell from "../../layouts/AppShell";
 
@@ -8,7 +8,9 @@ const AdminDashboard = () => {
 
   const [unread, setUnread] = useState(0);
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [pendingMedications, setPendingMedications] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingMedications, setLoadingMedications] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -24,8 +26,6 @@ const AdminDashboard = () => {
 
   const loadPendingUsers = async () => {
     setLoadingUsers(true);
-    setError("");
-    setSuccessMessage("");
     try {
       const response = await userApi.list();
       const queue = response.data.filter(
@@ -39,13 +39,27 @@ const AdminDashboard = () => {
     }
   };
 
+  const loadPendingMedications = async () => {
+    setLoadingMedications(true);
+    try {
+      const response = await medicationApi.list('pending');
+      setPendingMedications(response.data || []);
+    } catch {
+      console.error("Unable to load pending medications.");
+    } finally {
+      setLoadingMedications(false);
+    }
+  };
+
   useEffect(() => {
     load();
     loadPendingUsers();
+    loadPendingMedications();
 
     const interval = setInterval(() => {
       load();
       loadPendingUsers();
+      loadPendingMedications();
     }, 15000);
     return () => clearInterval(interval);
   }, [user]);
@@ -69,6 +83,28 @@ const AdminDashboard = () => {
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch {
       setError("Failed to update verification status.");
+    }
+  };
+
+  const approveMedication = async (medId) => {
+    try {
+      await medicationApi.update(medId, { status: "approved" });
+      setPendingMedications(prev => prev.filter(m => m.medication_id !== medId));
+      setSuccessMessage("Medication approved!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch {
+      setError("Failed to approve medication.");
+    }
+  };
+
+  const rejectMedication = async (medId) => {
+    try {
+      await medicationApi.delete(medId);
+      setPendingMedications(prev => prev.filter(m => m.medication_id !== medId));
+      setSuccessMessage("Medication rejected and deleted!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch {
+      setError("Failed to reject medication.");
     }
   };
 
@@ -113,10 +149,10 @@ const AdminDashboard = () => {
 
           <div style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 14, padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             <div>
-              <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Pending Action</div>
-              <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{loadingUsers ? "..." : (pendingUsers.length > 0 ? "Yes" : "No")}</div>
+              <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Medication Requests</div>
+              <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{pendingMedications.length}</div>
             </div>
-            <div style={{ color: "#2563eb", fontWeight: 900 }}>⚡</div>
+            <div style={{ color: "#2563eb", fontWeight: 900 }}>💊</div>
           </div>
         </div>
 
@@ -152,6 +188,38 @@ const AdminDashboard = () => {
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button onClick={() => approveUser(item.user_id)} style={{ padding: "6px 12px", borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 800, fontSize: 12, border: "none", cursor: "pointer" }}>Approve</button>
                         <button onClick={() => rejectUser(item.user_id)} style={{ padding: "6px 12px", borderRadius: 8, background: "#fef2f2", color: "#dc2626", border: "1px solid #fee2e2", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>Reject</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 16, padding: 18 }}>
+            <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18, fontWeight: 900 }}>Pending Medication Requests</h3>
+            <p style={{ margin: "4px 0 16px", color: "#64748b", fontWeight: 600, fontSize: 14 }}>Review new medications requested by doctors</p>
+
+            {loadingMedications ? (
+              <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>Loading medications...</div>
+            ) : pendingMedications.length === 0 ? (
+              <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>No pending medications.</div>
+            ) : (
+              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                {pendingMedications.map((item) => (
+                  <div key={item.medication_id} style={{ border: "1px solid #e6edf5", borderRadius: 14, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.22)", display: "grid", placeItems: "center", color: "#2563eb", fontWeight: 900 }}>💊</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 14 }}>{item.name}</div>
+                        <div style={{ color: "#64748b", fontWeight: 700, fontSize: 12 }}>Type: {item.type || "N/A"} • {item.description || "No description"}</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button onClick={() => approveMedication(item.medication_id)} style={{ padding: "6px 12px", borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 800, fontSize: 12, border: "none", cursor: "pointer" }}>Approve</button>
+                        <button onClick={() => rejectMedication(item.medication_id)} style={{ padding: "6px 12px", borderRadius: 8, background: "#fef2f2", color: "#dc2626", border: "1px solid #fee2e2", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>Reject</button>
                       </div>
                     </div>
                   </div>
