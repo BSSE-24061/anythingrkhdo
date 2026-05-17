@@ -111,10 +111,17 @@ const PatientDashboard = () => {
         const historyResponse = await historyApi.getByPatient(user.id);
         setRecentHistory(historyResponse.data || []);
 
+<<<<<<< HEAD
         const blogsResponse = await blogApi.feed(user.id);
         setBlogs(blogsResponse.data || []);
 
         const forumResponse = await forumApi.feed(user.id);
+=======
+        const blogsResponse = await blogApi.feed();
+        setBlogs(blogsResponse.data || []);
+
+        const forumResponse = await forumApi.feed();
+>>>>>>> parent of 42a0ed9 (push)
         setForumPosts(forumResponse.data || []);
       } catch (err) {
         console.error("Error loading patient data:", err);
@@ -383,6 +390,7 @@ const PatientDashboard = () => {
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#0f172a", fontWeight: 950, fontSize: 13 }}>
+<<<<<<< HEAD
                         {med.medication_name || "Medication"}
                       </div>
                       <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12, marginTop: 6 }}>
@@ -432,6 +440,26 @@ const PatientDashboard = () => {
                         </button>
                       )}
                     </div>
+=======
+                        {med.medication_name || "Lisinopril"}
+                      </div>
+                      <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12, marginTop: 6 }}>
+                        {med.dosage || "10mg"} • {med.frequency || "Morning"}
+                      </div>
+                    </div>
+
+                    <span
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontWeight: 900,
+                        fontSize: 11,
+                        ...(med.status === "taken" ? STATUS_PILL_STYLES.taken : STATUS_PILL_STYLES.upcoming),
+                      }}
+                    >
+                      {med.status || "upcoming"}
+                    </span>
+>>>>>>> parent of 42a0ed9 (push)
                   </div>
                 ))
               ) : (

@@ -234,7 +234,11 @@ const updateStatus = async (req, res) => {
                 title: requestedStatus === 'confirmed' ? 'Appointment confirmed' : 'Appointment cancelled',
                 body: requestedStatus === 'confirmed'
                     ? `Your appointment for ${appointmentWhen} has been confirmed.`
+<<<<<<< HEAD
                     : `Your appointment for ${appointmentWhen} has been cancelled.`,
+=======
+                    : `Your appointment for ${appointmentWhen} has been cancelled by the doctor.`,
+>>>>>>> parent of 42a0ed9 (push)
                 reference_id: updatedAppointment.appointment_id,
                 reference_type: 'appointment',
             });

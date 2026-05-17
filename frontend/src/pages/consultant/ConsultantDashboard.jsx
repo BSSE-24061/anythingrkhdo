@@ -36,8 +36,13 @@ const ConsultantDashboard = () => {
         userApi.list(),
         vitalApi.alerts(user.id),
         notificationApi.list(user.id),
+<<<<<<< HEAD
         blogApi.feed(user.id),
         forumApi.feed(user.id),
+=======
+        blogApi.feed(),
+        forumApi.feed(),
+>>>>>>> parent of 42a0ed9 (push)
       ]);
 
       setUnread(unreadRes.data.unread_count || 0);
@@ -148,20 +153,31 @@ const ConsultantDashboard = () => {
 
             <section style={{ background: "#ffffff", border: "1px solid #e6edf5", borderRadius: 16, padding: 18 }}>
               <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18, fontWeight: 900 }}>Latest Blogs</h3>
+<<<<<<< HEAD
               <div className="blog-carousel" style={{ marginTop: 12, paddingBottom: 10 }}>
                 {blogs.length > 0 ? (
                   blogs.slice(0, 3).map((blog) => (
                     <Link key={blog.article_id} to={`/blogs/${blog.article_id}`} className="blog-card" style={{ textDecoration: "none", padding: 18, minWidth: 300, maxWidth: 340, display: "flex", flexDirection: "column", justifyContent: "space-between", background: "#fff" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, marginBottom: 12 }}>
+=======
+              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                {blogs.length > 0 ? (
+                  blogs.slice(0, 3).map((blog) => (
+                    <Link key={blog.article_id} to={`/blogs/${blog.article_id}`} style={{ textDecoration: "none", border: "1px solid #e6edf5", borderRadius: 14, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+>>>>>>> parent of 42a0ed9 (push)
                         <div style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.22)", display: "grid", placeItems: "center", color: "#2563eb", fontWeight: 900 }}>📝</div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 13 }}>{blog.title}</div>
                           <div style={{ color: "#64748b", fontWeight: 700, fontSize: 12 }}>By {blog.author_name || "Unknown"}</div>
                         </div>
                       </div>
+<<<<<<< HEAD
                       <div style={{ color: "#64748b", fontWeight: 700, fontSize: 12, marginTop: "auto" }}>
                         Read details
                       </div>
+=======
+>>>>>>> parent of 42a0ed9 (push)
                     </Link>
                   ))
                 ) : (

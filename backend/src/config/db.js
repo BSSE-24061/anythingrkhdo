@@ -16,10 +16,13 @@ pool.connect((err, client, release) => {
     console.error("Error acquiring client", err.stack);
   } else {
     console.log("Successfully connected to PostgreSQL database!");
+<<<<<<< HEAD
     client.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'forum_posts';")
       .then(res => {
         require('fs').writeFileSync('db_diagnostic.txt', JSON.stringify(res.rows, null, 2));
       }).catch(e => console.error(e));
+=======
+>>>>>>> parent of 42a0ed9 (push)
   }
   if (client) release();
 });

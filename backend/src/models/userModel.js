@@ -167,7 +167,11 @@ const getUserByEmailAndRole = async (email, role) => {
 
 const getDoctorsBySpecialization = async (specialization) => {
   const result = await db.query(
+<<<<<<< HEAD
     "SELECT user_id, full_name, email, specialization, hospital_name, experience_years FROM users WHERE role = 'doctor' AND specialization ILIKE $1 AND is_verified = true",
+=======
+    "SELECT user_id, full_name, email, specialization, hospital_name, experience_years FROM users WHERE role = 'doctor' AND specialization = $1 AND is_verified = true",
+>>>>>>> parent of 42a0ed9 (push)
     [specialization]
   );
   return result.rows;

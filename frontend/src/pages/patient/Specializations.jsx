@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { userApi } from "../../utils/apiHelper";
 
+<<<<<<< HEAD
 import { useNavigate } from "react-router-dom";
 
 const SPECS = [
@@ -12,11 +13,25 @@ const SPECS = [
   { name: "General Medicine", desc: "Primary care and general health." },
   { name: "Psychiatry", desc: "Mental health and behavioral wellness." },
   { name: "Gynecology", desc: "Women's reproductive health." },
+=======
+const SPECS = [
+  { name: "Cardiology", icon: "❤️", desc: "Heart and vascular system health." },
+  { name: "Dermatology", icon: "✨", desc: "Skin, hair, and nail conditions." },
+  { name: "Neurology", icon: "🧠", desc: "Brain and nervous system disorders." },
+  { name: "Pediatrics", icon: "👶", desc: "Medical care for infants and children." },
+  { name: "Orthopedics", icon: "🦴", desc: "Bones, joints, and muscular system." },
+  { name: "General Medicine", icon: "🩺", desc: "Primary care and general health." },
+  { name: "Psychiatry", icon: "🧘", desc: "Mental health and behavioral wellness." },
+  { name: "Gynecology", icon: "🚺", desc: "Women's reproductive health." },
+>>>>>>> parent of 42a0ed9 (push)
 ];
 
 const Specializations = () => {
   const [counts, setCounts] = useState({});
+<<<<<<< HEAD
   const navigate = useNavigate();
+=======
+>>>>>>> parent of 42a0ed9 (push)
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -54,7 +69,10 @@ const Specializations = () => {
           <div 
             key={spec.name} 
             className="panel list-item" 
+<<<<<<< HEAD
             onClick={() => navigate(`/specializations/${encodeURIComponent(spec.name)}`)}
+=======
+>>>>>>> parent of 42a0ed9 (push)
             style={{ 
               display: "flex", 
               flexDirection: "column", 
@@ -67,6 +85,10 @@ const Specializations = () => {
             onMouseOver={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
             onMouseOut={(e) => e.currentTarget.style.transform = "translateY(0)"}
           >
+<<<<<<< HEAD
+=======
+            <div style={{ fontSize: 48, marginBottom: 16 }}>{spec.icon}</div>
+>>>>>>> parent of 42a0ed9 (push)
             <h3 style={{ fontSize: "1.5rem", marginBottom: 12 }}>{spec.name}</h3>
             <p className="muted" style={{ fontSize: "1rem", lineHeight: 1.5, marginBottom: 20 }}>{spec.desc}</p>
             <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8 }}>

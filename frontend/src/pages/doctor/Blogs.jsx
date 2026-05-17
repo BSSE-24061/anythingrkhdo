@@ -13,20 +13,32 @@ const Blogs = () => {
   const [commentText, setCommentText] = useState({});
   const [userLikedArticles, setUserLikedArticles] = useState(new Set());
   const [liking, setLiking] = useState({});
+<<<<<<< HEAD
   const [notice, setNotice] = useState("");
+=======
+>>>>>>> parent of 42a0ed9 (push)
 
   const load = async () => {
     try {
       const [feedResponse, pendingResponse, bookmarksResponse] = await Promise.all([
+<<<<<<< HEAD
         blogApi.feed(user.id), 
         blogApi.pending(user.id),
+=======
+        blogApi.feed(),
+        blogApi.pending(),
+>>>>>>> parent of 42a0ed9 (push)
         blogApi.bookmarks(user.id)
       ]);
       setFeed(feedResponse.data || []);
       setPending(pendingResponse.data || []);
       setBookmarks(bookmarksResponse.data || []);
+<<<<<<< HEAD
       setNotice("");
       
+=======
+
+>>>>>>> parent of 42a0ed9 (push)
       // Build set of articles already liked by this user
       const likedIds = new Set();
       const allArticles = [...(feedResponse.data || []), ...(pendingResponse.data || []), ...(bookmarksResponse.data || [])];
@@ -64,17 +76,25 @@ const Blogs = () => {
   };
 
   const likeArticle = async (articleId) => {
+<<<<<<< HEAD
     if (userLikedArticles.has(articleId)) {
       setNotice("You already liked this article.");
       return;
     }
     if (liking[articleId]) return;
+=======
+    // Prevent double-like
+    if (userLikedArticles.has(articleId) || liking[articleId]) {
+      return;
+    }
+>>>>>>> parent of 42a0ed9 (push)
 
     setLiking((prev) => ({ ...prev, [articleId]: true }));
 
     try {
       await blogApi.like({ article_id: articleId, user_id: user.id });
       setUserLikedArticles((prev) => new Set(prev).add(articleId));
+<<<<<<< HEAD
       setNotice("Thanks for liking this article.");
       load();
     } catch (error) {
@@ -83,6 +103,14 @@ const Blogs = () => {
       if (message.toLowerCase().includes("already")) {
         setUserLikedArticles((prev) => new Set(prev).add(articleId));
         setNotice("You already liked this article.");
+=======
+      load();
+    } catch (error) {
+      console.error(error);
+      // Check if error is duplicate like
+      if (error?.response?.status === 400 || error?.message?.toLowerCase().includes("already")) {
+        setUserLikedArticles((prev) => new Set(prev).add(articleId));
+>>>>>>> parent of 42a0ed9 (push)
       }
     } finally {
       setLiking((prev) => ({ ...prev, [articleId]: false }));
@@ -120,6 +148,7 @@ const Blogs = () => {
 
   return (
     <>
+<<<<<<< HEAD
       <section className="panel">
         <p className="eyebrow">{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Portal` : "Health Portal"}</p>
         <h2 style={{ marginTop: 4 }}>Manage Blogs</h2>
@@ -202,6 +231,69 @@ const Blogs = () => {
                 </div>
               </div>
             )) : <div style={{ padding: 40, textAlign: "center", background: "#fff", borderRadius: 20, border: "1px dashed #cbd5e1" }}><p className="muted" style={{ margin: 0, fontSize: "1.1rem" }}>No articles found in this section.</p></div>}
+=======
+      <section className="page-heading">
+        <div>
+          <h1>Blogs</h1>
+          <p className="muted">Publish blog drafts for admin approval, then like or comment on active posts.</p>
+        </div>
+      </section>
+
+      <section className="grid-layout two-col">
+        <div className="card">
+          <div className="section-heading"><h3>Create Article</h3></div>
+          <form className="form-grid" onSubmit={createArticle}>
+            <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" required />
+            <input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} placeholder="Category" />
+            <input value={form.cover_image} onChange={(event) => setForm((current) => ({ ...current, cover_image: event.target.value }))} placeholder="Cover image URL" />
+            <textarea rows="8" value={form.body} onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} placeholder="Write your article..." required />
+            <button type="submit" className="btn-main">Submit for Approval</button>
+          </form>
+        </div>
+
+        <div className="card">
+          <div className="section-heading">
+            <h3>Feed</h3>
+            <div className="inline-actions">
+              <button className={mode === "feed" ? "btn-main small" : "btn-soft small"} onClick={() => setMode("feed")}>Active</button>
+              <button className={mode === "pending" ? "btn-main small" : "btn-soft small"} onClick={() => setMode("pending")}>Pending</button>
+              <button className={mode === "bookmarks" ? "btn-main small" : "btn-soft small"} onClick={() => setMode("bookmarks")}>Bookmarks ({bookmarks.length})</button>
+            </div>
+          </div>
+
+          <div className="list-stack">
+            {items.length ? items.map((article) => (
+              <div className="list-item" key={article.article_id}>
+                <strong>{article.title}</strong>
+                <span>{article.author_name || article.author_user_id}</span>
+                <p>{article.body}</p>
+                <div className="inline-actions wrap">
+                  <button
+                    className="btn-soft small"
+                    onClick={() => likeArticle(article.article_id)}
+                    disabled={userLikedArticles.has(article.article_id) || liking[article.article_id]}
+                    style={{
+                      opacity: (userLikedArticles.has(article.article_id) || liking[article.article_id]) ? 0.6 : 1,
+                      cursor: (userLikedArticles.has(article.article_id) || liking[article.article_id]) ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    {liking[article.article_id] ? "Liking..." : (userLikedArticles.has(article.article_id) ? "✓ Liked" : "Like")}
+                  </button>
+                  <button className="btn-soft small" onClick={() => bookmarkArticle(article.article_id)}>Bookmark</button>
+                </div>
+
+                <div className="inline-actions wrap">
+                  <input
+                    style={{ flex: 1 }}
+                    value={commentText[article.article_id] || ""}
+                    onChange={(event) => setCommentText((current) => ({ ...current, [article.article_id]: event.target.value }))}
+                    placeholder="Write a comment"
+                  />
+                  <button className="btn-main small" onClick={() => commentArticle(article.article_id)}>Comment</button>
+                </div>
+              </div>
+            )) : <p className="muted">No articles found.</p>}
+>>>>>>> parent of 42a0ed9 (push)
           </div>
         </div>
       </section>

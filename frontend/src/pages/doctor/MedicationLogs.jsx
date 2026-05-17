@@ -86,11 +86,14 @@ const MedicationLogs = () => {
                   {log.status?.toUpperCase()}
                 </span>
                 <p>Scheduled: {log.scheduled_time ? new Date(log.scheduled_time).toLocaleString() : "N/A"}</p>
+<<<<<<< HEAD
                 {log.status === "taken" && log.taken_at && (
                   <p style={{ color: "#44aa44", fontWeight: 600, marginTop: 4 }}>
                     Taken at: {new Date(log.taken_at).toLocaleString()}
                   </p>
                 )}
+=======
+>>>>>>> parent of 42a0ed9 (push)
               </div>
             )) : <p className="muted">No medication logs for this patient.</p>}
           </div>

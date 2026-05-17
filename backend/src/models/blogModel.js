@@ -24,6 +24,7 @@ const createArticle = async (articleData) => {
   return result.rows[0];
 };
 
+<<<<<<< HEAD
 const getArticles = async (userId = null) => {
   const query = `
         SELECT ba.*, u.full_name AS author_name, u.specialization,
@@ -67,6 +68,29 @@ const getPendingArticles = async (userId = null) => {
         ORDER BY ba.created_at DESC;
     `;
   const result = await db.query(query, [userId]);
+=======
+const getArticles = async () => {
+  const query = `
+        SELECT ba.*, u.full_name AS author_name, u.specialization 
+        FROM blog_articles ba
+        JOIN users u ON ba.author_user_id = u.user_id
+        WHERE ba.status = 'active'
+        ORDER BY ba.published_at DESC;
+    `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const getPendingArticles = async () => {
+  const query = `
+        SELECT ba.*, u.full_name AS author_name, u.specialization 
+        FROM blog_articles ba
+        JOIN users u ON ba.author_user_id = u.user_id
+        WHERE ba.status = 'hidden'
+        ORDER BY ba.created_at DESC;
+    `;
+  const result = await db.query(query);
+>>>>>>> parent of 42a0ed9 (push)
   return result.rows;
 };
 
@@ -128,11 +152,14 @@ const removeBookmark = async (articleId, userId) => {
 const getUserBookmarks = async (userId) => {
   const query = `
         SELECT ba.*, u.full_name AS author_name, u.specialization,
+<<<<<<< HEAD
                EXISTS(
                  SELECT 1 FROM article_likes al
                  WHERE al.article_id = ba.article_id
                    AND al.user_id = $1
                ) AS user_has_liked,
+=======
+>>>>>>> parent of 42a0ed9 (push)
                ab.created_at AS bookmarked_at
         FROM article_bookmarks ab
         JOIN blog_articles ba ON ab.article_id = ba.article_id
@@ -146,6 +173,7 @@ const getUserBookmarks = async (userId) => {
 
 const getArticleById = async (articleId) => {
   const query = `
+<<<<<<< HEAD
         SELECT ba.*, u.full_name AS author_name, u.specialization,
                COALESCE(like_counts.likes_count, 0) AS likes_count
         FROM blog_articles ba
@@ -155,6 +183,11 @@ const getArticleById = async (articleId) => {
           FROM article_likes
           GROUP BY article_id
         ) AS like_counts ON like_counts.article_id = ba.article_id
+=======
+        SELECT ba.*, u.full_name AS author_name, u.specialization 
+        FROM blog_articles ba
+        JOIN users u ON ba.author_user_id = u.user_id
+>>>>>>> parent of 42a0ed9 (push)
         WHERE ba.article_id = $1;
     `;
   const result = await db.query(query, [articleId]);
@@ -174,6 +207,10 @@ const getArticleComments = async (articleId) => {
 };
 
 const likeArticle = async (articleId, userId) => {
+<<<<<<< HEAD
+=======
+  // Check if user has already liked this article
+>>>>>>> parent of 42a0ed9 (push)
   const alreadyLiked = await checkUserLiked(articleId, userId);
   if (alreadyLiked) {
     const error = new Error("User has already liked this article");
@@ -181,6 +218,7 @@ const likeArticle = async (articleId, userId) => {
     throw error;
   }
 
+<<<<<<< HEAD
   const query = `
         INSERT INTO article_likes (article_id, user_id)
         VALUES ($1, $2)
@@ -188,6 +226,29 @@ const likeArticle = async (articleId, userId) => {
     `;
   const result = await db.query(query, [articleId, userId]);
   return result.rows[0];
+=======
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const query = `
+            INSERT INTO article_likes (article_id, user_id)
+            VALUES ($1, $2)
+            RETURNING *;
+        `;
+    const result = await client.query(query, [articleId, userId]);
+    await client.query(
+      "UPDATE blog_articles SET likes_count = likes_count + 1 WHERE article_id = $1",
+      [articleId],
+    );
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+>>>>>>> parent of 42a0ed9 (push)
 };
 
 const updateArticleStatus = async (articleId, status) => {

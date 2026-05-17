@@ -113,8 +113,11 @@ const DoctorDashboard = () => {
         </div>
       </div>
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> parent of 42a0ed9 (push)
       {/* Content Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16 }}>
         {/* Left Column */}

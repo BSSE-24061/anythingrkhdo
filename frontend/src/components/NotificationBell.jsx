@@ -1,14 +1,24 @@
+<<<<<<< HEAD
 import { useEffect, useState, useRef } from 'react';
 import { notificationApi } from '../utils/apiHelper';
 import { getStoredUser } from '../utils/session';
 import { playNotificationSound } from '../utils/notificationSound';
 import { formatIslamabadDateTime } from '../utils/dateTime';
+=======
+import { useEffect, useState } from 'react';
+import { notificationApi } from '../utils/apiHelper';
+import { getStoredUser } from '../utils/session';
+import { playNotificationSound } from '../utils/notificationSound';
+>>>>>>> parent of 42a0ed9 (push)
 
 const NotificationBell = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+<<<<<<< HEAD
     const prevUnreadRef = useRef(0);
+=======
+>>>>>>> parent of 42a0ed9 (push)
     const user = getStoredUser();
 
     useEffect(() => {
@@ -23,10 +33,16 @@ const NotificationBell = () => {
                 setUnreadCount(unread.length);
 
                 // Play sound if there are new unread notifications
+<<<<<<< HEAD
                 if (unread.length > prevUnreadRef.current) {
                     playNotificationSound();
                 }
                 prevUnreadRef.current = unread.length;
+=======
+                if (unread.length > 0) {
+                    playNotificationSound();
+                }
+>>>>>>> parent of 42a0ed9 (push)
             } catch (error) {
                 console.error('Error loading notifications:', error);
             }
@@ -257,7 +273,16 @@ const NotificationBell = () => {
                                                         color: '#94a3b8',
                                                     }}
                                                 >
+<<<<<<< HEAD
                                                     {formatIslamabadDateTime(notif.created_at)}
+=======
+                                                    {new Date(notif.created_at).toLocaleDateString(undefined, {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
+>>>>>>> parent of 42a0ed9 (push)
                                                 </p>
                                             </div>
                                         </div>

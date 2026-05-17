@@ -1,5 +1,6 @@
 const db = require("../config/db");
 
+<<<<<<< HEAD
 let isInitialized = false;
 const initForumTables = async () => {
   if (isInitialized) return;
@@ -28,6 +29,8 @@ const initForumTables = async () => {
   }
 };
 
+=======
+>>>>>>> parent of 42a0ed9 (push)
 const createForumPost = async (postData) => {
   const { user_id, category, title, body } = postData;
 
@@ -41,6 +44,7 @@ const createForumPost = async (postData) => {
   return result.rows[0];
 };
 
+<<<<<<< HEAD
 const getForumPosts = async (userId = null) => {
   await initForumTables();
   const query = `
@@ -62,11 +66,25 @@ const getForumPosts = async (userId = null) => {
         ORDER BY fp.created_at DESC;
     `;
   const result = await db.query(query, [userId]);
+=======
+const getForumPosts = async () => {
+  const query = `
+        SELECT fp.*, u.full_name AS author_name, u.role AS author_role
+        FROM forum_posts fp
+        JOIN users u ON fp.user_id = u.user_id
+        WHERE fp.status = 'active'
+        ORDER BY fp.created_at DESC;
+    `;
+  const result = await db.query(query);
+>>>>>>> parent of 42a0ed9 (push)
   return result.rows;
 };
 
 const getForumPostById = async (postId) => {
+<<<<<<< HEAD
   await initForumTables();
+=======
+>>>>>>> parent of 42a0ed9 (push)
   const query = `
         SELECT fp.*, u.full_name AS author_name, u.role AS author_role
         FROM forum_posts fp
@@ -102,6 +120,7 @@ const getPostReplies = async (postId) => {
   return result.rows;
 };
 
+<<<<<<< HEAD
 const checkUserLikedPost = async (postId, userId) => {
   await initForumTables();
   const query = `
@@ -142,6 +161,10 @@ const likePost = async (postId, userId) => {
 
 const incrementViewCount = async (postId) => {
   const query = `UPDATE forum_posts SET views_count = COALESCE(views_count, 0) + 1 WHERE post_id = $1;`;
+=======
+const incrementViewCount = async (postId) => {
+  const query = `UPDATE forum_posts SET views_count = views_count + 1 WHERE post_id = $1;`;
+>>>>>>> parent of 42a0ed9 (push)
   await db.query(query, [postId]);
 };
 
@@ -190,7 +213,10 @@ module.exports = {
   getForumPostById,
   addReply,
   getPostReplies,
+<<<<<<< HEAD
   likePost,
+=======
+>>>>>>> parent of 42a0ed9 (push)
   incrementViewCount,
   reportPost,
   getReportedPosts,

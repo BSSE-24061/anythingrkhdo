@@ -22,8 +22,12 @@ const publishArticle = async (req, res) => {
 
 const getBlogFeed = async (req, res) => {
   try {
+<<<<<<< HEAD
     const userId = req.query.userId || null;
     const articles = await Blog.getArticles(userId);
+=======
+    const articles = await Blog.getArticles();
+>>>>>>> parent of 42a0ed9 (push)
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching blog feed:", error.message);
@@ -33,8 +37,12 @@ const getBlogFeed = async (req, res) => {
 
 const getPendingArticles = async (req, res) => {
   try {
+<<<<<<< HEAD
     const userId = req.query.userId || null;
     const articles = await Blog.getPendingArticles(userId);
+=======
+    const articles = await Blog.getPendingArticles();
+>>>>>>> parent of 42a0ed9 (push)
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching pending articles:", error.message);
