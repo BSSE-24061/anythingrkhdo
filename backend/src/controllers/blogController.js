@@ -22,7 +22,8 @@ const publishArticle = async (req, res) => {
 
 const getBlogFeed = async (req, res) => {
   try {
-    const articles = await Blog.getArticles();
+    const userId = req.query.userId || null;
+    const articles = await Blog.getArticles(userId);
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching blog feed:", error.message);
@@ -32,7 +33,8 @@ const getBlogFeed = async (req, res) => {
 
 const getPendingArticles = async (req, res) => {
   try {
-    const articles = await Blog.getPendingArticles();
+    const userId = req.query.userId || null;
+    const articles = await Blog.getPendingArticles(userId);
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching pending articles:", error.message);

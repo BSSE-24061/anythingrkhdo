@@ -15,6 +15,13 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const getDisplayName = (room) => {
+    if (user?.role === "consultant") {
+      return room.patient_name || room.other_user_name || "Patient";
+    }
+    return room.doctor_name ? `Dr. ${room.doctor_name}` : room.consultant_name || room.other_user_name || "Specialist";
+  };
+
   // Map rooms to a consistent structure
   const inboxRooms = useMemo(() => {
     return rooms.map(r => ({
@@ -95,7 +102,7 @@ const Chat = () => {
           consultant_user_id: selectedRoom.consultant_user_id,
           room_type: selectedRoom.room_type || "appointment"
         });
-        roomId = createRes.data.room_id;
+        roomId = createRes.data.room.room_id;
         // Update selection and search params to the new real room_id
         setCurrentSelection(roomId);
         setSearchParams({ room: roomId });
@@ -147,15 +154,18 @@ const Chat = () => {
                 }}
               >
                 <div style={{ width: 44, height: 44, borderRadius: "50%", background: room.uniqueId === currentSelection ? "#14b8a6" : "#2563eb", color: "#fff", display: "grid", placeItems: "center", fontWeight: 900, fontSize: 18 }}>
-                  {(room.doctor_name || room.consultant_name)?.[0] || "P"}
+                  {(room.other_user_name || room.patient_name || room.doctor_name || room.consultant_name || "P")[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 900, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {room.doctor_name ? `Dr. ${room.doctor_name}` : room.consultant_name || "Specialist"}
+                    {getDisplayName(room)}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div className="muted" style={{ fontSize: 12 }}>{room.room_type || "consultation"}</div>
-                    {!room.room_id && <span style={{ fontSize: 10, background: "rgba(37, 99, 235, 0.1)", color: "#2563eb", padding: "2px 6px", borderRadius: 4, fontWeight: 800 }}>New</span>}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {!room.room_id && <span style={{ fontSize: 10, background: "rgba(37, 99, 235, 0.1)", color: "#2563eb", padding: "2px 6px", borderRadius: 4, fontWeight: 800 }}>New</span>}
+                      {room.unread_count > 0 && <span style={{ fontSize: 10, background: "#ef4444", color: "#fff", padding: "2px 6px", borderRadius: 10, fontWeight: 900 }}>{room.unread_count}</span>}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -175,7 +185,7 @@ const Chat = () => {
               <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ fontWeight: 900, fontSize: "1.2rem" }}>
-                    {selectedRoom.doctor_name ? `Dr. ${selectedRoom.doctor_name}` : selectedRoom.consultant_name}
+                    {getDisplayName(selectedRoom)}
                   </div>
                   {selectedRoom.chat_active && <span className="status-pill status-open" style={{ fontSize: 10, background: "#dcfce7", color: "#166534" }}>Active Session</span>}
                 </div>
@@ -208,7 +218,7 @@ const Chat = () => {
                    <div style={{ flex: 1, display: "grid", placeItems: "center", opacity: 0.5 }}>
                       <div style={{ textAlign: "center" }}>
                         <div style={{ fontSize: 40, marginBottom: 12 }}>🤝</div>
-                        <p style={{ margin: 0, fontWeight: 800 }}>Start your conversation with {selectedRoom.doctor_name || selectedRoom.consultant_name}</p>
+                        <p style={{ margin: 0, fontWeight: 800 }}>Start your conversation with {getDisplayName(selectedRoom)}</p>
                       </div>
                    </div>
                 )}

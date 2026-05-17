@@ -89,93 +89,125 @@ const getRoomMessages = async (roomId) => {
 
 const getUserRooms = async (userId) => {
   const query = `
-        WITH all_potential_providers AS (
-          -- Part 1: Doctors from active appointments
-          SELECT 
-            d.user_id AS provider_id,
-            d.full_name AS provider_name,
-            d.role::TEXT AS role
-          FROM appointments a
-          JOIN users d ON a.doctor_user_id = d.user_id
-          WHERE a.patient_user_id = $1
-            AND LOWER(a.status::TEXT) IN ('pending', 'confirmed')
-          
-          UNION
+    WITH user_role_query AS (
+      SELECT role::TEXT AS current_user_role FROM users WHERE user_id = $1
+    ),
+    all_potential_providers AS (
+      -- If user is a patient, get doctors from active appointments
+      SELECT 
+        d.user_id AS other_user_id,
+        d.full_name AS other_user_name,
+        d.role::TEXT AS other_user_role
+      FROM appointments a
+      JOIN users d ON a.doctor_user_id = d.user_id
+      CROSS JOIN user_role_query urq
+      WHERE a.patient_user_id = $1
+        AND urq.current_user_role = 'patient'
+        AND LOWER(a.status::TEXT) IN ('pending', 'confirmed')
+      
+      UNION
 
-          -- Part 2: Verified consultants
-          SELECT 
-            c.user_id AS provider_id,
-            c.full_name AS provider_name,
-            c.role::TEXT AS role
-          FROM users c
-          WHERE c.role::TEXT = 'consultant'
-            AND c.is_verified = TRUE
-            AND EXISTS (SELECT 1 FROM users u WHERE u.user_id = $1 AND u.role::TEXT = 'patient')
-          
-          UNION
+      -- If user is a patient, get verified consultants
+      SELECT 
+        c.user_id AS other_user_id,
+        c.full_name AS other_user_name,
+        c.role::TEXT AS other_user_role
+      FROM users c
+      CROSS JOIN user_role_query urq
+      WHERE c.role::TEXT = 'consultant'
+        AND c.is_verified = TRUE
+        AND urq.current_user_role = 'patient'
+      
+      UNION
 
-          -- Part 3: Providers from existing chat rooms
-          SELECT 
-            COALESCE(cr.doctor_user_id, cr.consultant_user_id) AS provider_id,
-            COALESCE(d.full_name, c.full_name) AS provider_name,
-            COALESCE(d.role::TEXT, c.role::TEXT) AS role
-          FROM chat_rooms cr
-          LEFT JOIN users d ON cr.doctor_user_id = d.user_id
-          LEFT JOIN users c ON cr.consultant_user_id = c.user_id
-          WHERE cr.patient_user_id = $1 OR cr.doctor_user_id = $1 OR cr.consultant_user_id = $1
-        ),
-        distinct_providers AS (
-          SELECT DISTINCT provider_id, provider_name, role
-          FROM all_potential_providers
-          WHERE provider_id IS NOT NULL
-        ),
-        joined_data AS (
-          SELECT 
-            dp.provider_id,
-            dp.provider_name,
-            dp.role,
-            cr.room_id,
-            cr.last_message_at,
-            cr.created_at,
-            (CASE WHEN dp.role = 'doctor' THEN 'appointment' ELSE 'consultation' END) AS room_type
-          FROM distinct_providers dp
-          LEFT JOIN chat_rooms cr ON (
-            (cr.patient_user_id = $1 AND (cr.doctor_user_id = dp.provider_id OR cr.consultant_user_id = dp.provider_id)) OR
-            (cr.patient_user_id = dp.provider_id AND (cr.doctor_user_id = $1 OR cr.consultant_user_id = $1))
+      -- All existing chat rooms involving the current user
+      SELECT 
+        CASE 
+          WHEN cr.patient_user_id = $1 THEN COALESCE(cr.doctor_user_id, cr.consultant_user_id)
+          ELSE cr.patient_user_id
+        END AS other_user_id,
+        u.full_name AS other_user_name,
+        u.role::TEXT AS other_user_role
+      FROM chat_rooms cr
+      JOIN users u ON u.user_id = CASE 
+        WHEN cr.patient_user_id = $1 THEN COALESCE(cr.doctor_user_id, cr.consultant_user_id)
+        ELSE cr.patient_user_id
+      END
+      WHERE cr.patient_user_id = $1 OR cr.doctor_user_id = $1 OR cr.consultant_user_id = $1
+    ),
+    distinct_others AS (
+      SELECT DISTINCT other_user_id, other_user_name, other_user_role
+      FROM all_potential_providers
+      WHERE other_user_id IS NOT NULL
+    ),
+    joined_data AS (
+      SELECT 
+        dothers.other_user_id,
+        dothers.other_user_name,
+        dothers.other_user_role,
+        cr.room_id,
+        cr.patient_user_id,
+        cr.doctor_user_id,
+        cr.consultant_user_id,
+        cr.last_message_at,
+        cr.created_at,
+        cr.room_type,
+        -- fallback room_type if room doesn't exist
+        (CASE WHEN dothers.other_user_role = 'doctor' THEN 'appointment' ELSE 'consultation' END) AS fallback_room_type
+      FROM distinct_others dothers
+      LEFT JOIN chat_rooms cr ON (
+        (cr.patient_user_id = $1 AND (cr.doctor_user_id = dothers.other_user_id OR cr.consultant_user_id = dothers.other_user_id)) OR
+        (cr.patient_user_id = dothers.other_user_id AND (cr.doctor_user_id = $1 OR cr.consultant_user_id = $1))
+      )
+    )
+    SELECT DISTINCT ON (other_user_id)
+      room_id,
+      COALESCE(patient_user_id, CASE WHEN urq.current_user_role = 'patient' THEN $1 ELSE other_user_id END) AS patient_user_id,
+      COALESCE(doctor_user_id, CASE WHEN urq.current_user_role = 'doctor' THEN $1 WHEN other_user_role = 'doctor' THEN other_user_id ELSE NULL END) AS doctor_user_id,
+      COALESCE(consultant_user_id, CASE WHEN urq.current_user_role = 'consultant' THEN $1 WHEN other_user_role = 'consultant' THEN other_user_id ELSE NULL END) AS consultant_user_id,
+      COALESCE(room_type, fallback_room_type) AS room_type,
+      created_at,
+      last_message_at,
+      
+      -- Instead of hardcoding $1, we select the correct names:
+      (SELECT full_name FROM users WHERE user_id = COALESCE(patient_user_id, CASE WHEN urq.current_user_role = 'patient' THEN $1 ELSE other_user_id END)) AS patient_name,
+      (SELECT full_name FROM users WHERE user_id = COALESCE(doctor_user_id, CASE WHEN urq.current_user_role = 'doctor' THEN $1 WHEN other_user_role = 'doctor' THEN other_user_id ELSE NULL END)) AS doctor_name,
+      (SELECT full_name FROM users WHERE user_id = COALESCE(consultant_user_id, CASE WHEN urq.current_user_role = 'consultant' THEN $1 WHEN other_user_role = 'consultant' THEN other_user_id ELSE NULL END)) AS consultant_name,
+      
+      (
+        CASE
+          WHEN other_user_role = 'doctor' AND urq.current_user_role = 'patient' THEN EXISTS (
+            SELECT 1 FROM appointments a
+            WHERE a.patient_user_id = $1
+              AND a.doctor_user_id = other_user_id
+              AND LOWER(a.status::TEXT) IN ('pending', 'confirmed')
           )
-        )
-        SELECT DISTINCT ON (provider_id)
-          room_id,
-          $1 AS patient_user_id,
-          (CASE WHEN role = 'doctor' THEN provider_id ELSE NULL END) AS doctor_user_id,
-          (CASE WHEN role = 'consultant' THEN provider_id ELSE NULL END) AS consultant_user_id,
-          room_type,
-          created_at,
-          last_message_at,
-          (SELECT full_name FROM users WHERE user_id = $1) AS patient_name,
-          (CASE WHEN role = 'doctor' THEN provider_name ELSE NULL END) AS doctor_name,
-          (CASE WHEN role = 'consultant' THEN provider_name ELSE NULL END) AS consultant_name,
-          (
-            CASE
-              WHEN role = 'doctor' THEN EXISTS (
-                SELECT 1 FROM appointments a
-                WHERE a.patient_user_id = $1
-                  AND a.doctor_user_id = provider_id
-                  AND LOWER(a.status::TEXT) IN ('pending', 'confirmed')
-              )
-              ELSE TRUE
-            END
-          ) AS chat_active,
-          COALESCE((
-            SELECT COUNT(*)::int
-            FROM chat_messages m
-            WHERE m.room_id = joined_data.room_id
-              AND m.is_read = FALSE
-              AND m.sender_id <> $1
-          ), 0) AS unread_count
-        FROM joined_data
-        ORDER BY provider_id, last_message_at DESC NULLS LAST;
-    `;
+          WHEN other_user_role = 'patient' AND urq.current_user_role = 'doctor' THEN EXISTS (
+            SELECT 1 FROM appointments a
+            WHERE a.patient_user_id = other_user_id
+              AND a.doctor_user_id = $1
+              AND LOWER(a.status::TEXT) IN ('pending', 'confirmed')
+          )
+          ELSE TRUE
+        END
+      ) AS chat_active,
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM chat_messages m
+        WHERE m.room_id = joined_data.room_id
+          AND m.is_read = FALSE
+          AND m.sender_id <> $1
+      ), 0) AS unread_count,
+      
+      -- To make it easy for frontend:
+      other_user_id,
+      other_user_name,
+      other_user_role
+      
+    FROM joined_data
+    CROSS JOIN user_role_query urq
+    ORDER BY other_user_id, last_message_at DESC NULLS LAST;
+  `;
   const result = await db.query(query, [userId]);
   return result.rows;
 };

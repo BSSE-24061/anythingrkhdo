@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   vitalApi,
@@ -39,9 +39,21 @@ const PatientDashboard = () => {
   const [recentHistory, setRecentHistory] = useState([]);
   const [blogs, setBlogs] = useState([]);
   const [forumPosts, setForumPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const playedAlertsRef = useRef(new Set());
+
+  const playAlertSound = () => {
+    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+    audio.loop = true;
+    audio.play().catch(() => { console.log("Sound blocked by browser") });
+    setTimeout(() => {
+      audio.pause();
+      audio.currentTime = 0;
+    }, 3000);
+  };
 
   useEffect(() => {
-    const load = async () => {
+    const loadUnread = async () => {
       if (!user?.id) return;
       try {
         const unreadResponse = await notificationApi.unreadCount(user.id);
@@ -50,45 +62,85 @@ const PatientDashboard = () => {
         setUnread(0);
       }
     };
-    load();
-  }, [user]);
 
-  useEffect(() => {
     const loadPatientData = async () => {
       if (!user?.id) return;
-
       try {
         const appointmentsResponse = await appointmentApi.byPatient(user.id);
         setAppointments(appointmentsResponse.data || []);
 
-        const alertsResponse = await vitalApi.getAlerts(user.id);
-        setAlerts(alertsResponse.data || []);
+        const logsResponse = await medicationApi.byPatientLogs(user.id);
+        const logsData = Array.isArray(logsResponse.data) ? logsResponse.data : [];
+        setMedicationLogs(logsData);
 
-        const logsResponse = await medicationApi.getLogsByPatient(user.id);
-        setMedicationLogs(logsResponse.data || []);
+        const alertsResponse = await vitalApi.getAlerts(user.id);
+        const data = alertsResponse.data || [];
+
+        // Detect Overdue Medications (Pending and time is in the past)
+        const now = new Date();
+        const overdueReminders = logsData.filter(log =>
+          log.status === "pending" &&
+          log.scheduled_time &&
+          new Date(log.scheduled_time) < now &&
+          !playedAlertsRef.current.has(`med-${log.log_id}`)
+        );
+
+        const newUnread = data.filter(a => !a.is_read && !playedAlertsRef.current.has(a.alert_id || a.id));
+
+        if (newUnread.length > 0 || overdueReminders.length > 0) {
+          playAlertSound();
+          // Track that we played sound for these IDs
+          newUnread.forEach(a => playedAlertsRef.current.add(a.alert_id || a.id));
+          overdueReminders.forEach(log => playedAlertsRef.current.add(`med-${log.log_id}`));
+        }
+
+        // Create virtual alerts for overdue medications to show in the sidebar
+        const virtualMedAlerts = logsData
+          .filter(log => log.status === "pending" && log.scheduled_time && new Date(log.scheduled_time) < now)
+          .sort((a, b) => new Date(b.scheduled_time) - new Date(a.scheduled_time))
+          .map(log => ({
+            alert_id: `med-${log.log_id}`,
+            alert_type: "Medication Reminder",
+            message: `Please take your ${log.medication_name} (${log.dosage}). Scheduled for ${new Date(log.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+            triggered_at: log.scheduled_time,
+            is_read: false
+          }));
+
+        setAlerts([...virtualMedAlerts, ...data]);
 
         const historyResponse = await historyApi.getByPatient(user.id);
         setRecentHistory(historyResponse.data || []);
 
-        const blogsResponse = await blogApi.feed();
+        const blogsResponse = await blogApi.feed(user.id);
         setBlogs(blogsResponse.data || []);
 
-        const forumResponse = await forumApi.feed();
+        const forumResponse = await forumApi.feed(user.id);
         setForumPosts(forumResponse.data || []);
       } catch (err) {
         console.error("Error loading patient data:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadPatientData();
+    const loadAll = () => {
+      loadUnread();
+      loadPatientData();
+    };
+
+    loadAll();
+    const interval = setInterval(loadAll, 15000);
+    return () => clearInterval(interval);
   }, [user]);
 
-  const activeMedications = medicationLogs.filter((log) => log.status === "active");
   const upcomingAppointments = appointments
     .filter((apt) => apt.status !== "completed" && apt.status !== "cancelled")
     .slice(0, 2);
 
-  const todaysMedications = medicationLogs.slice(0, 4);
+  const todaysMedications = medicationLogs
+    .filter(log => log.status === "pending" || log.status === "taken")
+    .slice(0, 4);
+  const unreadAlertsCount = alerts.filter(a => !a.is_read).length;
 
   const nextAppointment = appointments
     .filter((apt) => apt.status !== "completed" && apt.status !== "cancelled" && new Date(apt.scheduled_at) > new Date())
@@ -96,10 +148,16 @@ const PatientDashboard = () => {
 
   const nextAppointmentDate = nextAppointment
     ? new Date(nextAppointment.scheduled_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+    })
     : "N/A";
+
+  if (loading) return (
+    <div style={{ padding: 40, textAlign: "center", fontWeight: 800, color: "#64748b" }}>
+      Loading your health dashboard...
+    </div>
+  );
 
   if (!user) return null;
 
@@ -157,7 +215,7 @@ const PatientDashboard = () => {
           <div>
             <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Active Medications</div>
             <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>
-              {activeMedications.length || medicationLogs.length || 0}
+              {medicationLogs.length || 0}
             </div>
           </div>
           <div style={{ color: "#2563eb", fontWeight: 900 }}>💊</div>
@@ -194,7 +252,7 @@ const PatientDashboard = () => {
         >
           <div>
             <div style={{ color: "#475569", fontWeight: 800, fontSize: 14 }}>Unread Alerts</div>
-            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unread}</div>
+            <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 22 }}>{unreadAlertsCount}</div>
           </div>
           <div style={{ color: "#2563eb", fontWeight: 900 }}>🔔</div>
         </div>
@@ -325,24 +383,55 @@ const PatientDashboard = () => {
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#0f172a", fontWeight: 950, fontSize: 13 }}>
-                        {med.medication_name || "Lisinopril"}
+                        {med.medication_name || "Medication"}
                       </div>
                       <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12, marginTop: 6 }}>
-                        {med.dosage || "10mg"} • {med.frequency || "Morning"}
+                        {med.dosage || "1 dose"} • {med.frequency || "Scheduled"}
                       </div>
                     </div>
 
-                    <span
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontWeight: 900,
-                        fontSize: 11,
-                        ...(med.status === "taken" ? STATUS_PILL_STYLES.taken : STATUS_PILL_STYLES.upcoming),
-                      }}
-                    >
-                      {med.status || "upcoming"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          fontWeight: 900,
+                          fontSize: 11,
+                          ...(med.status === "taken" ? STATUS_PILL_STYLES.taken : STATUS_PILL_STYLES.upcoming),
+                        }}
+                      >
+                        {med.status || "upcoming"}
+                      </span>
+                      {med.status === "pending" && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await medicationApi.updateLogStatus(med.log_id, "taken");
+                              // Update the state locally to reflect the change
+                              setMedicationLogs(prev => 
+                                prev.map(log => 
+                                  log.log_id === med.log_id ? { ...log, status: "taken", taken_at: new Date() } : log
+                                )
+                              );
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          style={{
+                            background: "#22c55e",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Mark Taken
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (

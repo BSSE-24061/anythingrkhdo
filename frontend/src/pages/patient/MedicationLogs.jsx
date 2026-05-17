@@ -32,15 +32,10 @@ const MedicationLogs = () => {
     loadLogs();
   }, [user?.id]);
 
-  const mark = async (id, status) => {
+  const mark = async (logId, status) => {
     if (!user?.id) return;
     try {
-      await medicationApi.log({
-        patient_medication_id: id,
-        patient_user_id: user.id,
-        status,
-        taken_at: new Date(),
-      });
+      await medicationApi.updateLogStatus(logId, status);
       loadLogs();
     } catch (err) {
       alert(getErrorMessage(err, "Failed to update medication log."));
@@ -99,8 +94,11 @@ const MedicationLogs = () => {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <h4 style={{ margin: "0 0 4px 0", fontSize: "1.3rem" }}>{l.medication_name || "Medication"}</h4>
-                      <p className="muted" style={{ fontWeight: 700, fontSize: "1rem" }}>
+                      <p className="muted" style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
                         {l.dosage} {l.frequency && `• ${l.frequency}`}
+                      </p>
+                      <p className="muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+                        {l.status === 'taken' && l.taken_at ? `Taken: ${new Date(l.taken_at).toLocaleString()}` : `Scheduled: ${l.scheduled_time ? new Date(l.scheduled_time).toLocaleString() : 'N/A'}`}
                       </p>
                     </div>
                   </div>
@@ -113,7 +111,7 @@ const MedicationLogs = () => {
                     <div style={{ display: "flex", gap: 10 }}>
                       <button 
                         className="btn-main small" 
-                        onClick={() => mark(l.patient_medication_id, "taken")}
+                        onClick={() => mark(l.log_id, "taken")}
                         style={{ background: "#22c55e", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)" }}
                         disabled={l.status === "taken"}
                       >
@@ -121,7 +119,7 @@ const MedicationLogs = () => {
                       </button>
                       <button 
                         className="btn-ghost small" 
-                        onClick={() => mark(l.patient_medication_id, "missed")}
+                        onClick={() => mark(l.log_id, "missed")}
                         style={{ color: "#ef4444", borderColor: "#fecaca" }}
                         disabled={l.status === "taken"}
                       >

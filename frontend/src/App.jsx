@@ -309,7 +309,7 @@ function App() {
         <Route
           path="/forum"
           element={
-            <ProtectedRoute allowedRoles={["patient"]}>
+            <ProtectedRoute allowedRoles={["patient", "admin", "consultant"]}>
               <PatientLayout>
                 <Forum user={user} />
               </PatientLayout>
@@ -320,7 +320,7 @@ function App() {
         <Route
           path="/chat"
           element={
-            <ProtectedRoute allowedRoles={["patient"]}>
+            <ProtectedRoute allowedRoles={["patient", "consultant"]}>
               <PatientLayout>
                 <Chat user={user} />
               </PatientLayout>

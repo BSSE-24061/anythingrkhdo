@@ -15,4 +15,7 @@ router.get('/patient/:patientId', vitalController.getVitals);
 // GET /api/vitals/alerts/:patientId - Get all active alerts for a patient (auth required)
 router.get('/alerts/:patientId', vitalController.getAlerts);
 
+// PATCH /api/vitals/alerts/:patientId/read - Mark all alerts as read for a patient
+router.patch('/alerts/:patientId/read', vitalController.markAlertsRead);
+
 module.exports = router;

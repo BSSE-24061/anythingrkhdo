@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -73,7 +74,7 @@ const Navbar = () => {
   return (
     <header className="app-navbar">
       <div className="app-navbar-left">
-        <div className="brand-mark">+</div>
+        <img className="brand-mark" src="/small%20logo.png" alt="CareSync logo" />
         <div>
           <h1>CareSync</h1>
           <p>{(user.role || "").toUpperCase()} PORTAL</p>
@@ -95,6 +96,7 @@ const Navbar = () => {
       </nav>
 
       <div className="app-navbar-right">
+        <NotificationBell />
         <div className="user-chip">
           <span>{user.name?.split(" ")[0] || "User"}</span>
         </div>

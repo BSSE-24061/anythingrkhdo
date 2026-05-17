@@ -53,9 +53,22 @@ const getPatientAlerts = async (patientId) => {
     return result.rows;
 };
 
+// 5. Mark all alerts as read for a patient
+const markAlertsAsRead = async (patientId) => {
+    const query = `
+        UPDATE alerts 
+        SET is_read = TRUE 
+        WHERE patient_user_id = $1 AND is_read = FALSE
+        RETURNING *;
+    `;
+    const result = await db.query(query, [patientId]);
+    return result.rows;
+};
+
 module.exports = {
     createVitalLog,
     getPatientVitals,
     createAlert,
-    getPatientAlerts
+    getPatientAlerts,
+    markAlertsAsRead
 };

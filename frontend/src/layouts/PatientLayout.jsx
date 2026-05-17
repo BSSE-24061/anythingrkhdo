@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
+import { chatApi, vitalApi } from "../utils/apiHelper";
+import NotificationBell from "../components/NotificationBell";
 
-const NAV = [
+const PATIENT_NAV = [
   ["Dashboard", "/patient/dashboard"],
   ["Alerts", "/alerts"],
   ["Appointments", "/appointments"],
@@ -16,10 +18,66 @@ const NAV = [
   ["Consultant", "/consultant"],
 ];
 
+const ADMIN_NAV = [
+  ["Dashboard", "/admin/dashboard"],
+  ["Blogs", "/blogs"],
+  ["Forum", "/forum"],
+  ["Blog Approval", "/admin/blog-approval"],
+  ["Comment Moderation", "/admin/comment-moderation"],
+  ["Create Blog", "/admin/create-blog"],
+];
+
+const CONSULTANT_NAV = [
+  ["Dashboard", "/consultant/dashboard"],
+  ["Chat", "/chat"],
+  ["Blogs", "/blogs"],
+  ["Forum", "/forum"],
+];
+
+const DOCTOR_NAV = [
+  ["Dashboard", "/doctor/dashboard"],
+  ["Appointments", "/doctor/appointments"],
+  ["Vitals", "/doctor/vitals"],
+  ["Patients", "/doctor/patients"],
+  ["Prescriptions", "/doctor/prescriptions"],
+  ["Medication Logs", "/doctor/medication-logs"],
+  ["Medical History", "/doctor/history"],
+  ["Availability", "/doctor/availability"],
+  ["Chat", "/doctor/chat"],
+  ["Blogs", "/doctor/blogs"],
+  ["Forum", "/doctor/forum"],
+];
+
 const PatientLayout = ({ children }) => {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadChats, setUnreadChats] = useState(0);
+  const [hasAlerts, setHasAlerts] = useState(false);
+  const role = user?.role?.toLowerCase() || "";
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchBadges = async () => {
+      try {
+        const chatRes = await chatApi.inbox(user.id);
+        const unreadRooms = (chatRes.data || []).filter(r => r.unread_count > 0).length;
+        setUnreadChats(unreadRooms);
+
+        if (role === "patient") {
+          const alertRes = await vitalApi.alerts(user.id);
+          setHasAlerts((alertRes.data || []).some(a => !a.is_read));
+        }
+      } catch (err) {
+        console.error("Failed to load badges:", err);
+      }
+    };
+
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 15000);
+    return () => clearInterval(interval);
+  }, [user?.id, role]);
 
   const handleLogout = () => {
     clearSession();
@@ -27,6 +85,11 @@ const PatientLayout = ({ children }) => {
   };
 
   if (!user) return null;
+
+  let navItems = PATIENT_NAV;
+  if (role === "admin") navItems = ADMIN_NAV;
+  else if (role === "consultant") navItems = CONSULTANT_NAV;
+  else if (role === "doctor") navItems = DOCTOR_NAV;
 
   return (
     <div
@@ -37,7 +100,7 @@ const PatientLayout = ({ children }) => {
         display: "flex",
       }}
     >
-      {/* Left Sidebar (screenshot-like theme) */}
+      {/* Left Sidebar */}
       <aside
         style={{
           width: 248,
@@ -55,22 +118,18 @@ const PatientLayout = ({ children }) => {
       >
         {/* Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
+          <img
+            src="/small%20logo.png"
+            alt="MediCare logo"
             style={{
               width: 34,
               height: 34,
               borderRadius: 10,
-              background: "#2563eb",
-              color: "#fff",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 900,
-              fontSize: 16,
+              objectFit: "contain",
+              background: "#fff",
               boxShadow: "0 8px 20px rgba(37, 99, 235, 0.25)",
             }}
-          >
-            ✓
-          </div>
+          />
           <div style={{ lineHeight: 1.1 }}>
             <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14 }}>
               MediCare
@@ -81,9 +140,10 @@ const PatientLayout = ({ children }) => {
                 letterSpacing: "0.12em",
                 color: "#64748b",
                 fontWeight: 800,
+                textTransform: "uppercase"
               }}
             >
-              PATIENT
+              {role}
             </div>
           </div>
         </div>
@@ -97,10 +157,10 @@ const PatientLayout = ({ children }) => {
             marginTop: 8,
           }}
         >
-          {NAV.map(([label, path]) => {
+          {navItems.map(([label, path]) => {
             const active =
               location.pathname === path ||
-              (path !== "/patient/dashboard" &&
+              (path !== `/${role}/dashboard` &&
                 location.pathname.startsWith(path));
             return (
               <Link
@@ -127,9 +187,20 @@ const PatientLayout = ({ children }) => {
                     height: 10,
                     borderRadius: 999,
                     background: active ? "#2563eb" : "#cbd5e1",
+                    flexShrink: 0,
                   }}
                 />
-                {label}
+                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+                {label === "Chat" && unreadChats > 0 && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    {unreadChats}
+                  </span>
+                )}
+                {label === "Alerts" && role === "patient" && hasAlerts && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    !
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -155,7 +226,7 @@ const PatientLayout = ({ children }) => {
               textTransform: "uppercase",
             }}
           >
-            Patient
+            {role}
           </div>
           <div
             style={{
@@ -165,7 +236,7 @@ const PatientLayout = ({ children }) => {
               fontSize: 14,
             }}
           >
-            {user.name || "Patient"}
+            {user.name || "User"}
           </div>
 
           <button
@@ -189,7 +260,16 @@ const PatientLayout = ({ children }) => {
       </aside>
 
       {/* Main */}
-      <main style={{ flex: 1, padding: 24 }}>{children}</main>
+      <main style={{ flex: 1, padding: "24px 32px", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 999, border: "1px solid #e2e8f0", padding: 4, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+            <NotificationBell />
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          {children}
+        </div>
+      </main>
     </div>
   );
 };

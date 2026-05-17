@@ -22,7 +22,11 @@ const createPost = async (req, res) => {
 
 const getFeed = async (req, res) => {
   try {
-    const posts = await Community.getForumPosts();
+    let userId = req.query.userId;
+    if (!userId || userId === "undefined" || userId === "null") {
+      userId = null;
+    }
+    const posts = await Community.getForumPosts(userId);
     res.status(200).json(posts);
   } catch (error) {
     console.error("Error fetching feed:", error.message);
@@ -72,6 +76,25 @@ const loadReplies = async (req, res) => {
     res.status(200).json(replies);
   } catch (error) {
     console.error("Error fetching replies:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const likePost = async (req, res) => {
+  try {
+    const { post_id, user_id } = req.body;
+
+    if (!post_id || !user_id) {
+      return res.status(400).json({ error: " Post ID and User ID are required" });
+    }
+
+    const like = await Community.likePost(post_id, user_id);
+    res.status(201).json({ message: "Post liked successfully", like });
+  } catch (error) {
+    console.error("Error liking post:", error.message);
+    if (error.code === "23505" || error.message.toLowerCase().includes("already")) {
+      return res.status(400).json({ error: "Already liked" });
+    }
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -139,6 +162,7 @@ module.exports = {
   getPost,
   replyToPost,
   loadReplies,
+  likePost,
   submitReport,
   getReports,
   updatePostStatus,

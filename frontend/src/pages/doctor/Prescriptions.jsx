@@ -148,14 +148,6 @@ const Prescriptions = () => {
 
       medicationCreated = true;
 
-      await medicationApi.createLog({
-        patient_medication_id: patientMedicationId,
-        patient_user_id: selectedPatient,
-        scheduled_time: medForm.start_date || null,
-        status: "pending",
-        source: "prescription",
-      });
-
       const medResponse = await prescriptionApi.byPrescription(selectedPrescription);
       setPrescriptionMedications(medResponse.data || []);
     } catch (error) {

@@ -126,8 +126,18 @@ const getAlerts = async (req, res) => {
   }
 };
 
+const markAlertsRead = async (req, res) => {
+  try {
+    const alerts = await Vital.markAlertsAsRead(req.params.patientId);
+    res.status(200).json({ message: "Alerts marked as read", data: alerts });
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   addVitalLog,
   getVitals,
   getAlerts,
+  markAlertsRead,
 };
