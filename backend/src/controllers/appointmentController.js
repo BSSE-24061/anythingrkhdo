@@ -234,7 +234,7 @@ const updateStatus = async (req, res) => {
                 title: requestedStatus === 'confirmed' ? 'Appointment confirmed' : 'Appointment cancelled',
                 body: requestedStatus === 'confirmed'
                     ? `Your appointment for ${appointmentWhen} has been confirmed.`
-                    : `Your appointment for ${appointmentWhen} has been cancelled by the doctor.`,
+                    : `Your appointment for ${appointmentWhen} has been cancelled.`,
                 reference_id: updatedAppointment.appointment_id,
                 reference_type: 'appointment',
             });

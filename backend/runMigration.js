@@ -1,7 +1,6 @@
-const pg = require('pg');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+const pg = require("pg");
+const fs = require("fs");
+require("dotenv").config();
 
 const client = new pg.Client({
   user: process.env.DB_USER,
@@ -11,35 +10,29 @@ const client = new pg.Client({
   port: process.env.DB_PORT,
 });
 
-const migrationsDir = path.join(__dirname, 'migrations');
-
-async function runMigrations() {
+async function runMigration() {
   try {
     await client.connect();
-    const files = fs.readdirSync(migrationsDir)
-      .filter((file) => file.endsWith('.sql'))
-      .sort();
+    console.log("Running migration 002_add_doctor_availability.sql...");
 
-    if (!files.length) {
-      console.log('ℹ️ No migration files found.');
-      return;
+    const sql = fs.readFileSync("./migrations/002_add_doctor_availability.sql", "utf8");
+    await client.query(sql);
+
+    console.log("Migration completed successfully.");
+
+    const result = await client.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_name='doctor_availability'"
+    );
+
+    if (result.rows.length > 0) {
+      console.log("Table doctor_availability verified.");
     }
-
-    for (const file of files) {
-      const filePath = path.join(migrationsDir, file);
-      console.log(`📝 Running migration ${file}...`);
-      const sql = fs.readFileSync(filePath, 'utf8');
-      await client.query(sql);
-      console.log(`✅ Applied ${file}`);
-    }
-
-    console.log('✅ All migrations applied successfully.');
   } catch (error) {
-    console.error('❌ Migration failed:', error.message);
+    console.error("Migration failed:", error.message);
     process.exit(1);
   } finally {
     await client.end();
   }
 }
 
-runMigrations();
+runMigration();

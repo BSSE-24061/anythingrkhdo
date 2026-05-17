@@ -23,7 +23,7 @@ const Community = () => {
 
       if (user?.role === "admin") {
         const [pendingRes, reportsRes] = await Promise.all([
-          blogApi.pending(user?.id),
+          blogApi.pending(),
           forumApi.reports(),
         ]);
         setPendingBlogs(pendingRes.data);

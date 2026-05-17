@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { notificationApi } from '../utils/apiHelper';
 import { getStoredUser } from '../utils/session';
 import { playNotificationSound } from '../utils/notificationSound';
+import { formatIslamabadDateTime } from '../utils/dateTime';
 
 const NotificationBell = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const prevUnreadRef = useRef(0);
     const user = getStoredUser();
 
     useEffect(() => {
@@ -21,9 +23,10 @@ const NotificationBell = () => {
                 setUnreadCount(unread.length);
 
                 // Play sound if there are new unread notifications
-                if (unread.length > 0) {
+                if (unread.length > prevUnreadRef.current) {
                     playNotificationSound();
                 }
+                prevUnreadRef.current = unread.length;
             } catch (error) {
                 console.error('Error loading notifications:', error);
             }
@@ -48,9 +51,7 @@ const NotificationBell = () => {
 
     const markAllAsRead = async () => {
         try {
-            for (const notif of notifications.filter(n => !n.is_read)) {
-                await notificationApi.markAsRead(notif.notification_id);
-            }
+            await notificationApi.markAllRead(user.id);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             setUnreadCount(0);
         } catch (error) {
@@ -254,12 +255,7 @@ const NotificationBell = () => {
                                                         color: '#94a3b8',
                                                     }}
                                                 >
-                                                    {new Date(notif.created_at).toLocaleDateString(undefined, {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                    })}
+                                                    {formatIslamabadDateTime(notif.created_at)}
                                                 </p>
                                             </div>
                                         </div>

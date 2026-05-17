@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const crypto = require("crypto");
+const SPECIALIZATIONS = require("../constants/specializations");
 
 // 1. Get All Users
 const getAllUsers = async () => {
@@ -167,17 +168,59 @@ const getUserByEmailAndRole = async (email, role) => {
 
 const getDoctorsBySpecialization = async (specialization) => {
   const result = await db.query(
-    "SELECT user_id, full_name, email, specialization, hospital_name, experience_years FROM users WHERE role = 'doctor' AND specialization = $1 AND is_verified = true",
+    "SELECT user_id, full_name, email, specialization, hospital_name, experience_years FROM users WHERE role = 'doctor' AND specialization ILIKE $1 AND is_verified = true",
     [specialization]
   );
   return result.rows;
 };
 
 const getAllSpecializations = async () => {
-  const result = await db.query(
-    "SELECT DISTINCT specialization FROM users WHERE role = 'doctor' AND specialization IS NOT NULL AND is_verified = true ORDER BY specialization"
-  );
-  return result.rows.map(row => row.specialization);
+  try {
+    const result = await db.query(
+      `
+        SELECT
+          ms.name,
+          ms.description,
+          COUNT(u.user_id)::int AS doctor_count
+        FROM medical_specializations ms
+        LEFT JOIN users u
+          ON LOWER(u.specialization) = LOWER(ms.name)
+         AND u.role = 'doctor'
+         AND u.is_verified = true
+        WHERE ms.is_active = true
+        GROUP BY ms.name, ms.description
+        ORDER BY ms.name;
+      `
+    );
+    return result.rows;
+  } catch (error) {
+    if (error.code !== "42P01") {
+      throw error;
+    }
+
+    const existingDoctors = await db.query(
+      `
+        SELECT specialization, COUNT(*)::int AS doctor_count
+        FROM users
+        WHERE role = 'doctor'
+          AND is_verified = true
+          AND specialization IS NOT NULL
+        GROUP BY specialization;
+      `
+    );
+
+    const countsByName = new Map(
+      existingDoctors.rows.map((row) => [
+        String(row.specialization).toLowerCase(),
+        row.doctor_count,
+      ])
+    );
+
+    return SPECIALIZATIONS.map((item) => ({
+      ...item,
+      doctor_count: countsByName.get(item.name.toLowerCase()) || 0,
+    }));
+  }
 };
 
 const getConsultant = async () => {

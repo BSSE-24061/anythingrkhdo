@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getErrorMessage, userApi } from "../../utils/apiHelper";
 import AuthLayout from "../../layouts/AuthLayout";
 import { setSession } from "../../utils/session";
+import { normalizeSpecializations } from "../../utils/specializations";
 
 const emptyPatientData = {
   dateOfBirth: "",
@@ -33,6 +34,9 @@ const Signup = () => {
   const [formData, setFormData] = useState(initialFormState);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [specializations, setSpecializations] = useState(() =>
+    normalizeSpecializations([])
+  );
   const navigate = useNavigate();
 
   const handleChange = (field, value) => {
@@ -123,6 +127,20 @@ const Signup = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadSpecializations = async () => {
+      try {
+        const response = await userApi.getAllSpecializations();
+        setSpecializations(normalizeSpecializations(response.data));
+      } catch (err) {
+        console.error(err);
+        setSpecializations(normalizeSpecializations([]));
+      }
+    };
+
+    loadSpecializations();
+  }, []);
 
   useEffect(() => {
     if (window.google) {
@@ -314,13 +332,21 @@ const Signup = () => {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginLeft: 4 }}>Specialization</label>
                   <input
-                    type="text"
+                    type="search"
+                    list="doctor-specialization-options"
                     value={formData.specialization}
                     onChange={(e) => handleChange("specialization", e.target.value)}
-                    placeholder="e.g. Cardiologist"
+                    placeholder="Search and choose a specialization"
                     required
                     style={{ padding: "14px 16px", borderRadius: 12, border: "2px solid #e6edf5", background: "#f8fafc", fontSize: 15, outline: "none", color: "#0f172a", fontWeight: 600, width: "100%", boxSizing: "border-box" }}
                   />
+                  <datalist id="doctor-specialization-options">
+                    {specializations.map((spec) => (
+                      <option key={spec.name} value={spec.name}>
+                        {spec.description}
+                      </option>
+                    ))}
+                  </datalist>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginLeft: 4 }}>License Number</label>

@@ -2,6 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
 import { chatApi } from "../utils/apiHelper";
+import NotificationBell from "../components/NotificationBell";
 
 const DOCTOR_NAV = [
   ["Dashboard", "/doctor/dashboard"],
@@ -73,22 +74,16 @@ const DoctorRouteLayout = () => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
+          <img
+            src="/small%20logo.png"
+            alt="MediCare logo"
             style={{
-              width: 34,
               height: 34,
-              borderRadius: 10,
-              background: "#2563eb",
-              color: "#fff",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 900,
-              fontSize: 16,
-              boxShadow: "0 8px 20px rgba(37, 99, 235, 0.25)",
+              width: "auto",
+              objectFit: "contain",
+              borderRadius: 6,
             }}
-          >
-            ✓
-          </div>
+          />
           <div style={{ lineHeight: 1.1 }}>
             <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14 }}>
               MediCare
@@ -210,8 +205,15 @@ const DoctorRouteLayout = () => {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: 24 }}>
-        <Outlet />
+      <main style={{ flex: 1, padding: "24px 32px", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 999, border: "1px solid #e2e8f0", padding: 4, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+            <NotificationBell />
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Outlet />
+        </div>
       </main>
     </div>
   );

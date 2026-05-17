@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../../layouts/AuthLayout";
 import { getErrorMessage, userApi } from "../../utils/apiHelper";
 import { setSession } from "../../utils/session";
+import { normalizeSpecializations } from "../../utils/specializations";
 
 const emptyPatientData = {
   dateOfBirth: "",
@@ -43,9 +44,26 @@ const GoogleOnboarding = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [specializations, setSpecializations] = useState(() =>
+    normalizeSpecializations([])
+  );
 
   const googleProfile = savedOnboarding?.googleProfile;
   const onboardingToken = savedOnboarding?.onboardingToken;
+
+  useEffect(() => {
+    const loadSpecializations = async () => {
+      try {
+        const response = await userApi.getAllSpecializations();
+        setSpecializations(normalizeSpecializations(response.data));
+      } catch (err) {
+        console.error(err);
+        setSpecializations(normalizeSpecializations([]));
+      }
+    };
+
+    loadSpecializations();
+  }, []);
 
   const handleChange = (field, value) => {
     setFormData((prev) => {
@@ -295,14 +313,22 @@ const GoogleOnboarding = () => {
                   <label>
                     Specialization
                     <input
-                      type="text"
+                      type="search"
+                      list="google-doctor-specialization-options"
                       value={formData.specialization}
                       onChange={(e) =>
                         handleChange("specialization", e.target.value)
                       }
-                      placeholder="Specialization"
+                      placeholder="Search and choose a specialization"
                       required
                     />
+                    <datalist id="google-doctor-specialization-options">
+                      {specializations.map((spec) => (
+                        <option key={spec.name} value={spec.name}>
+                          {spec.description}
+                        </option>
+                      ))}
+                    </datalist>
                   </label>
                   <label>
                     License Number

@@ -1,38 +1,31 @@
 import { useEffect, useState } from "react";
 import { userApi } from "../../utils/apiHelper";
+import { normalizeSpecializations } from "../../utils/specializations";
 
-const SPECS = [
-  { name: "Cardiology", icon: "❤️", desc: "Heart and vascular system health." },
-  { name: "Dermatology", icon: "✨", desc: "Skin, hair, and nail conditions." },
-  { name: "Neurology", icon: "🧠", desc: "Brain and nervous system disorders." },
-  { name: "Pediatrics", icon: "👶", desc: "Medical care for infants and children." },
-  { name: "Orthopedics", icon: "🦴", desc: "Bones, joints, and muscular system." },
-  { name: "General Medicine", icon: "🩺", desc: "Primary care and general health." },
-  { name: "Psychiatry", icon: "🧘", desc: "Mental health and behavioral wellness." },
-  { name: "Gynecology", icon: "🚺", desc: "Women's reproductive health." },
-];
+import { useNavigate } from "react-router-dom";
 
 const Specializations = () => {
-  const [counts, setCounts] = useState({});
+  const [specializations, setSpecializations] = useState([]);
+  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCounts = async () => {
+    const fetchSpecializations = async () => {
       try {
-        const response = await userApi.list();
-        const doctors = (response.data || []).filter(u => u.role === "doctor");
-        const tally = {};
-        doctors.forEach(doc => {
-          if (doc.specialization) {
-            tally[doc.specialization] = (tally[doc.specialization] || 0) + 1;
-          }
-        });
-        setCounts(tally);
+        const response = await userApi.getAllSpecializations();
+        setSpecializations(normalizeSpecializations(response.data));
       } catch (err) {
         console.error(err);
+        setSpecializations(normalizeSpecializations([]));
       }
     };
-    fetchCounts();
+    fetchSpecializations();
   }, []);
+
+  const visibleSpecializations = specializations.filter((spec) => {
+    const text = `${spec.name} ${spec.description}`.toLowerCase();
+    return text.includes(query.trim().toLowerCase());
+  });
 
   return (
     <div className="page-shell">
@@ -44,13 +37,24 @@ const Specializations = () => {
             Find the right specialist for your specific health needs from our network of verified professionals.
           </p>
         </div>
+        <label style={{ display: "grid", gap: 8, alignSelf: "end" }}>
+          Search specializations
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by name or care area"
+            style={{ minHeight: 48 }}
+          />
+        </label>
       </section>
 
       <div className="grid-layout" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
-        {SPECS.map((spec) => (
+        {visibleSpecializations.map((spec) => (
           <div 
             key={spec.name} 
             className="panel list-item" 
+            onClick={() => navigate(`/specializations/${encodeURIComponent(spec.name)}`)}
             style={{ 
               display: "flex", 
               flexDirection: "column", 
@@ -63,16 +67,20 @@ const Specializations = () => {
             onMouseOver={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
             onMouseOut={(e) => e.currentTarget.style.transform = "translateY(0)"}
           >
-            <div style={{ fontSize: 48, marginBottom: 16 }}>{spec.icon}</div>
             <h3 style={{ fontSize: "1.5rem", marginBottom: 12 }}>{spec.name}</h3>
-            <p className="muted" style={{ fontSize: "1rem", lineHeight: 1.5, marginBottom: 20 }}>{spec.desc}</p>
+            <p className="muted" style={{ fontSize: "1rem", lineHeight: 1.5, marginBottom: 20 }}>{spec.description}</p>
             <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8 }}>
               <span className="status-pill status-open" style={{ background: "rgba(0, 86, 179, 0.1)", color: "var(--accent)" }}>
-                {counts[spec.name] || 0} Doctors Available
+                {spec.doctor_count || 0} Doctors Available
               </span>
             </div>
           </div>
         ))}
+        {visibleSpecializations.length === 0 && (
+          <div className="panel">
+            <p className="muted">No specializations matched your search.</p>
+          </div>
+        )}
       </div>
     </div>
   );

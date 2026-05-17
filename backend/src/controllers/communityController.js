@@ -1,10 +1,5 @@
 const Community = require("../models/communityModel");
 
-const parseUserId = (value) => {
-  const id = Number(value);
-  return Number.isFinite(id) ? id : null;
-};
-
 const createPost = async (req, res) => {
   try {
     const { user_id, title, body } = req.body;
@@ -27,7 +22,10 @@ const createPost = async (req, res) => {
 
 const getFeed = async (req, res) => {
   try {
-    const userId = parseUserId(req.query.userId);
+    let userId = req.query.userId;
+    if (!userId || userId === "undefined" || userId === "null") {
+      userId = null;
+    }
     const posts = await Community.getForumPosts(userId);
     res.status(200).json(posts);
   } catch (error) {
@@ -163,8 +161,8 @@ module.exports = {
   getFeed,
   getPost,
   replyToPost,
-  likePost,
   loadReplies,
+  likePost,
   submitReport,
   getReports,
   updatePostStatus,
