@@ -369,13 +369,11 @@ img {
   width: 46px;
   height: 46px;
   flex: 0 0 auto;
-  display: grid;
-  place-items: center;
+  display: block;
   border-radius: 16px;
-  background: var(--accent);
-  color: #ffffff;
-  font-size: 1.35rem;
-  font-weight: 900;
+  object-fit: contain;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
 }
 
 .app-navbar-left h1 {

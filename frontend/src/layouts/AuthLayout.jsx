@@ -25,24 +25,19 @@ const AuthLayout = ({
       }}
     >
       <div style={{ textAlign: "center" }}>
-        <div
+        <img
+          src="/logo.jpeg"
+          alt="MediCare logo"
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 48,
-            height: 48,
-            borderRadius: 14,
-            background: "#2563eb",
-            color: "#fff",
-            fontSize: 22,
-            fontWeight: 900,
-            boxShadow: "0 8px 20px rgba(37, 99, 235, 0.25)",
-            marginBottom: 20,
+            width: "min(100%, 380px)",
+            height: "auto",
+            borderRadius: 20,
+            objectFit: "contain",
+            background: "#ffffff",
+            boxShadow: "0 14px 34px rgba(37, 99, 235, 0.18)",
+            marginBottom: 24,
           }}
-        >
-          ✓
-        </div>
+        />
         <h1
           style={{
             margin: 0,

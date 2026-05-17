@@ -74,7 +74,7 @@ const Navbar = () => {
   return (
     <header className="app-navbar">
       <div className="app-navbar-left">
-        <div className="brand-mark">+</div>
+        <img className="brand-mark" src="/small%20logo.png" alt="CareSync logo" />
         <div>
           <h1>CareSync</h1>
           <p>{(user.role || "").toUpperCase()} PORTAL</p>
