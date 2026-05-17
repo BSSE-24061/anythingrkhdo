@@ -94,8 +94,11 @@ const MedicationLogs = () => {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <h4 style={{ margin: "0 0 4px 0", fontSize: "1.3rem" }}>{l.medication_name || "Medication"}</h4>
-                      <p className="muted" style={{ fontWeight: 700, fontSize: "1rem" }}>
+                      <p className="muted" style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
                         {l.dosage} {l.frequency && `• ${l.frequency}`}
+                      </p>
+                      <p className="muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+                        {l.status === 'taken' && l.taken_at ? `Taken: ${new Date(l.taken_at).toLocaleString()}` : `Scheduled: ${l.scheduled_time ? new Date(l.scheduled_time).toLocaleString() : 'N/A'}`}
                       </p>
                     </div>
                   </div>

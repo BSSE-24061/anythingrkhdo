@@ -25,7 +25,7 @@ const Forum = () => {
       const counts = {};
       const likedIds = new Set();
       (response.data || []).forEach(post => {
-        counts[post.post_id] = post.likes_count || 0;
+        counts[post.post_id] = parseInt(post.likes_count || 0, 10);
         if (post.user_has_liked) {
           likedIds.add(post.post_id);
         }
@@ -96,7 +96,7 @@ const Forum = () => {
       setUserLikedPosts((prev) => new Set(prev).add(postId));
       setPostLikeCounts((prev) => ({
         ...prev,
-        [postId]: (prev[postId] || 0) + 1,
+        [postId]: parseInt(prev[postId] || 0, 10) + 1,
       }));
       setNotice("Thanks for liking this post.");
     } catch (error) {
@@ -115,7 +115,7 @@ const Forum = () => {
     <>
       <section className="hero-panel" style={{ background: "linear-gradient(135deg, #4f46e5 0%, #312e81 100%)", color: "#fff", borderRadius: 24, padding: "48px 40px", marginBottom: 32 }}>
         <div>
-          <h1 className="eyebrow" style={{ color: "#a5b4fc", letterSpacing: "0.15em", textTransform: "uppercase" }}>Doctor Portal</h1>
+          <h1 className="eyebrow" style={{ color: "#a5b4fc", letterSpacing: "0.15em", textTransform: "uppercase" }}>{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Portal` : "Health Portal"}</h1>
           <h2 style={{ color: "#f8fafc", fontSize: "3rem", margin: "12px 0", letterSpacing: "-0.03em" }}>Health Forum</h2>
           <p style={{ color: "#c7d2fe", fontSize: "1.2rem", maxWidth: 600, lineHeight: 1.6 }}>
             Post, discuss, reply, and report items for moderation.

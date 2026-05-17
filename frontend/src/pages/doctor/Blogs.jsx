@@ -122,7 +122,7 @@ const Blogs = () => {
     <>
       <section className="hero-panel" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", color: "#fff", borderRadius: 24, padding: "48px 40px", marginBottom: 32 }}>
         <div>
-          <h1 className="eyebrow" style={{ color: "#38bdf8", letterSpacing: "0.15em", textTransform: "uppercase" }}>Doctor Portal</h1>
+          <h1 className="eyebrow" style={{ color: "#38bdf8", letterSpacing: "0.15em", textTransform: "uppercase" }}>{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Portal` : "Health Portal"}</h1>
           <h2 style={{ color: "#f8fafc", fontSize: "3rem", margin: "12px 0", letterSpacing: "-0.03em" }}>Manage Blogs</h2>
           <p style={{ color: "#94a3b8", fontSize: "1.2rem", maxWidth: 600, lineHeight: 1.6 }}>
             Publish blog drafts for admin approval, then like or comment on active posts.
