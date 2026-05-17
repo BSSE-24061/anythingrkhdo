@@ -60,7 +60,7 @@ export const prescriptionApi = {
 };
 
 export const medicationApi = {
-  list: () => api.get("/medications"),
+  list: (status) => api.get("/medications", { params: { status } }),
   create: (payload) => api.post("/medications", payload),
   getById: (id) => api.get(`/medications/${id}`),
   update: (id, payload) => api.put(`/medications/${id}`, payload),

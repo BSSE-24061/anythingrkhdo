@@ -3,7 +3,8 @@ const Notification = require("../models/notificationModel");
 
 const getMedications = async (req, res) => {
   try {
-    const medications = await Medication.getAllMedications();
+    const status = req.query.status || 'approved';
+    const medications = await Medication.getAllMedications(status);
     res.status(200).json(medications);
   } catch (error) {
     console.error("Error fetching medications:", error.message);

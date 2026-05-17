@@ -16,7 +16,9 @@ const Prescriptions = () => {
   const [selectedPrescription, setSelectedPrescription] = useState("");
   const [loading, setLoading] = useState(true);
   const [masterForm, setMasterForm] = useState({ diagnosis: "", diagnosis_notes: "", symptoms_notes: "", follow_up_date: "" });
-  const [medForm, setMedForm] = useState({ medication_id: "", dosage: "", frequency: "", start_date: "", end_date: "" });
+  const [medForm, setMedForm] = useState({ medication_id: "", medicationName: "", dosage: "", frequency: "", start_date: "", end_date: "" });
+  const [showRequestMedication, setShowRequestMedication] = useState(false);
+  const [requestMedForm, setRequestMedForm] = useState({ name: "", type: "", description: "" });
 
   useEffect(() => {
     const load = async () => {
@@ -25,7 +27,7 @@ const Prescriptions = () => {
       try {
         const [appointmentsResponse, medicationsResponse] = await Promise.all([
           appointmentApi.byDoctor(user.id),
-          medicationApi.list(),
+          medicationApi.list('approved'),
         ]);
         setPatients(patientsFromAppointments(appointmentsResponse.data || []));
         setMedications(medicationsResponse.data || []);
@@ -128,6 +130,11 @@ const Prescriptions = () => {
       return;
     }
 
+    if (!medForm.medication_id) {
+      alert("Please select a valid medication from the search list.");
+      return;
+    }
+
     let medicationCreated = false;
 
     try {
@@ -154,8 +161,26 @@ const Prescriptions = () => {
       console.error(error);
     } finally {
       if (medicationCreated) {
-        setMedForm({ medication_id: "", dosage: "", frequency: "", start_date: "", end_date: "" });
+        setMedForm({ medication_id: "", medicationName: "", dosage: "", frequency: "", start_date: "", end_date: "" });
       }
+    }
+  };
+
+  const requestNewMedication = async (event) => {
+    event.preventDefault();
+    try {
+      await medicationApi.create({
+        name: requestMedForm.name,
+        type: requestMedForm.type,
+        description: requestMedForm.description,
+        status: "pending"
+      });
+      alert("Medication requested successfully! An admin will review it.");
+      setRequestMedForm({ name: "", type: "", description: "" });
+      setShowRequestMedication(false);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to request medication.");
     }
   };
 
@@ -208,12 +233,46 @@ const Prescriptions = () => {
           </select>
 
           <form className="form-grid" onSubmit={addMedication} style={{ marginTop: 14 }}>
-            <select value={medForm.medication_id} onChange={(event) => setMedForm((current) => ({ ...current, medication_id: event.target.value }))} required>
-              <option value="">Choose a medication</option>
-              {medications.map((medication) => (
-                <option key={medication.medication_id} value={medication.medication_id}>{medication.name}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", position: "relative" }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  list="medications-list"
+                  placeholder="Search for a medication..."
+                  value={medForm.medicationName || ""}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    const med = medications.find(m => m.name === name);
+                    setMedForm(current => ({ 
+                      ...current, 
+                      medicationName: name, 
+                      medication_id: med ? med.medication_id : "" 
+                    }));
+                  }}
+                  required
+                />
+                <datalist id="medications-list">
+                  {medications.map((medication) => (
+                    <option key={medication.medication_id} value={medication.name} />
+                  ))}
+                </datalist>
+              </div>
+              <button type="button" className="btn-soft" style={{ padding: "12px", whiteSpace: "nowrap" }} onClick={() => setShowRequestMedication(!showRequestMedication)}>
+                {showRequestMedication ? "Cancel Request" : "Not Found? Request"}
+              </button>
+            </div>
+            
+            {showRequestMedication && (
+              <div style={{ background: "rgba(2, 132, 199, 0.05)", padding: 16, borderRadius: 12, border: "1px dashed rgba(2, 132, 199, 0.3)", marginBottom: 16 }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "var(--text)" }}>Request New Medication</h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <input value={requestMedForm.name} onChange={(e) => setRequestMedForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Medication Name" required />
+                  <input value={requestMedForm.type} onChange={(e) => setRequestMedForm(prev => ({ ...prev, type: e.target.value }))} placeholder="Type (e.g. Tablet, Syrup)" />
+                  <textarea rows="2" value={requestMedForm.description} onChange={(e) => setRequestMedForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Description/Reason for request" />
+                  <button type="button" onClick={requestNewMedication} className="btn-main small" style={{ width: "fit-content" }}>Submit Request</button>
+                </div>
+              </div>
+            )}
+
             <div className="form-columns">
               <input value={medForm.dosage} onChange={(event) => setMedForm((current) => ({ ...current, dosage: event.target.value }))} placeholder="Dosage" required />
               <input value={medForm.frequency} onChange={(event) => setMedForm((current) => ({ ...current, frequency: event.target.value }))} placeholder="Frequency" required />

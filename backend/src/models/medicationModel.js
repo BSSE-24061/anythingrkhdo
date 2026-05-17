@@ -1,21 +1,36 @@
 const db = require("../config/db");
 
-const getAllMedications = async () => {
-  const result = await db.query("SELECT * FROM medications ORDER BY name ASC");
+// Ensure status column exists
+const initDb = async () => {
+  try {
+    await db.query("ALTER TABLE medications ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'approved'");
+  } catch (err) {
+    console.error("Failed to add status column to medications:", err.message);
+  }
+};
+initDb();
+
+const getAllMedications = async (status = 'approved') => {
+  if (status === 'all') {
+    const result = await db.query("SELECT * FROM medications ORDER BY name ASC");
+    return result.rows;
+  }
+  const result = await db.query("SELECT * FROM medications WHERE status = $1 ORDER BY name ASC", [status]);
   return result.rows;
 };
 
 const createMedication = async (medicationData) => {
-  const { name, type, description } = medicationData;
+  const { name, type, description, status } = medicationData;
   const query = `
-        INSERT INTO medications (name, type, description)
-        VALUES ($1, $2, $3)
+        INSERT INTO medications (name, type, description, status)
+        VALUES ($1, $2, $3, $4)
         RETURNING *;
     `;
   const result = await db.query(query, [
     name,
     type || null,
     description || null,
+    status || 'approved'
   ]);
   return result.rows[0];
 };
@@ -29,17 +44,21 @@ const getMedicationById = async (medicationId) => {
 };
 
 const updateMedication = async (medicationId, medicationData) => {
-  const { name, type, description } = medicationData;
+  const { name, type, description, status } = medicationData;
   const query = `
         UPDATE medications
-        SET name = $1, type = $2, description = $3
-        WHERE medication_id = $4
+        SET name = COALESCE($1, name), 
+            type = COALESCE($2, type), 
+            description = COALESCE($3, description),
+            status = COALESCE($4, status)
+        WHERE medication_id = $5
         RETURNING *;
     `;
   const result = await db.query(query, [
-    name,
+    name || null,
     type || null,
     description || null,
+    status || null,
     medicationId,
   ]);
   return result.rows[0];
