@@ -8,6 +8,22 @@
     "data_type": "uuid"
   },
   {
+    "column_name": "category",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "title",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "body",
+    "data_type": "text"
+  },
+  {
+    "column_name": "status",
+    "data_type": "USER-DEFINED"
+  },
+  {
     "column_name": "views_count",
     "data_type": "integer"
   },
@@ -20,19 +36,7 @@
     "data_type": "timestamp without time zone"
   },
   {
-    "column_name": "status",
-    "data_type": "USER-DEFINED"
-  },
-  {
-    "column_name": "category",
-    "data_type": "character varying"
-  },
-  {
-    "column_name": "title",
-    "data_type": "character varying"
-  },
-  {
-    "column_name": "body",
-    "data_type": "text"
+    "column_name": "likes_count",
+    "data_type": "integer"
   }
 ]
