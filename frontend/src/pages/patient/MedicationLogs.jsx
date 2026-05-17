@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import api, { medicationApi, getErrorMessage } from "../../utils/apiHelper";
+import { medicationApi, getErrorMessage } from "../../utils/apiHelper";
 import { getStoredUser } from "../../utils/session";
 
 const PILL_STYLES = {
@@ -7,6 +7,12 @@ const PILL_STYLES = {
   missed: { background: "rgba(239, 68, 68, 0.12)", color: "#dc2626" },
   pending: { background: "rgba(245, 158, 11, 0.14)", color: "#b45309" },
   active: { background: "rgba(37, 99, 235, 0.12)", color: "#1d4ed8" },
+};
+
+const DOSE_LABELS = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
 };
 
 const MedicationLogs = () => {
@@ -30,6 +36,8 @@ const MedicationLogs = () => {
 
   useEffect(() => {
     loadLogs();
+    const interval = setInterval(loadLogs, 30000);
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   const mark = async (logId, status) => {
@@ -95,7 +103,7 @@ const MedicationLogs = () => {
                     <div style={{ minWidth: 0 }}>
                       <h4 style={{ margin: "0 0 4px 0", fontSize: "1.3rem" }}>{l.medication_name || "Medication"}</h4>
                       <p className="muted" style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
-                        {l.dosage} {l.frequency && `• ${l.frequency}`}
+                        {DOSE_LABELS[l.dose_period] || "Scheduled"} dose: {l.dose_dosage || l.dosage || "Dose not specified"}
                       </p>
                       <p className="muted" style={{ fontSize: "0.85rem", margin: 0 }}>
                         {l.status === 'taken' && l.taken_at ? `Taken: ${new Date(l.taken_at).toLocaleString()}` : `Scheduled: ${l.scheduled_time ? new Date(l.scheduled_time).toLocaleString() : 'N/A'}`}

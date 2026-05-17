@@ -17,15 +17,24 @@ const createPrescription = async (prescriptionData) => {
 
 // 2. Add a specific medication to that prescription
 const addPatientMedication = async (medicationData) => {
-    const { prescription_id, patient_user_id, medication_id, dosage, frequency, start_date, end_date } = medicationData;
+    const { prescription_id, patient_user_id, medication_id, dosage, frequency, start_date, end_date, dosage_schedule } = medicationData;
     
     const query = `
-        INSERT INTO patient_medications (prescription_id, patient_user_id, medication_id, dosage, frequency, start_date, end_date)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO patient_medications (prescription_id, patient_user_id, medication_id, dosage, frequency, start_date, end_date, dosage_schedule)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
         RETURNING *;
     `;
     
-    const values = [prescription_id, patient_user_id, medication_id, dosage, frequency, start_date, end_date];
+    const values = [
+        prescription_id,
+        patient_user_id,
+        medication_id,
+        dosage,
+        frequency,
+        start_date,
+        end_date,
+        dosage_schedule ? JSON.stringify(dosage_schedule) : null,
+    ];
     const result = await db.query(query, values);
     return result.rows[0];
 };

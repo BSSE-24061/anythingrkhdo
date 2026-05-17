@@ -4,8 +4,12 @@ const db = require("../config/db");
 const initDb = async () => {
   try {
     await db.query("ALTER TABLE medications ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'approved'");
+    await db.query("ALTER TABLE patient_medications ADD COLUMN IF NOT EXISTS dosage_schedule JSONB");
+    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_period VARCHAR(20)");
+    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_dosage TEXT");
+    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS missed_alert_sent BOOLEAN NOT NULL DEFAULT FALSE");
   } catch (err) {
-    console.error("Failed to add status column to medications:", err.message);
+    console.error("Failed to ensure medication columns:", err.message);
   }
 };
 initDb();
@@ -79,10 +83,12 @@ const createMedicationLog = async (logData) => {
     scheduled_time,
     taken_at,
     status,
+    dose_period,
+    dose_dosage,
   } = logData;
   const query = `
-        INSERT INTO medication_logs (patient_medication_id, patient_user_id, scheduled_time, taken_at, status)
-        VALUES ($1, $2, $3, $4, COALESCE($5::medication_status, 'pending'))
+        INSERT INTO medication_logs (patient_medication_id, patient_user_id, scheduled_time, taken_at, status, dose_period, dose_dosage)
+        VALUES ($1, $2, $3, $4, COALESCE($5::medication_status, 'pending'), $6, $7)
         RETURNING *;
     `;
   const result = await db.query(query, [
@@ -91,13 +97,52 @@ const createMedicationLog = async (logData) => {
     scheduled_time || null,
     taken_at || null,
     status || null,
+    dose_period || null,
+    dose_dosage || null,
   ]);
+  return result.rows[0];
+};
+
+const markOverdueMedicationLogs = async (patientId) => {
+  const query = `
+        UPDATE medication_logs
+        SET status = 'missed'::medication_status
+        WHERE patient_user_id = $1
+          AND status = 'pending'
+          AND scheduled_time IS NOT NULL
+          AND scheduled_time < NOW()
+        RETURNING *;
+    `;
+  const result = await db.query(query, [patientId]);
+  return result.rows;
+};
+
+const getUnalertedMissedMedicationLogs = async (patientId) => {
+  const query = `
+        SELECT ml.*, pm.dosage, pm.frequency, pm.start_date, pm.end_date, m.name AS medication_name, m.type AS medication_type
+        FROM medication_logs ml
+        LEFT JOIN patient_medications pm ON ml.patient_medication_id = pm.patient_medication_id
+        LEFT JOIN medications m ON pm.medication_id = m.medication_id
+        WHERE ml.patient_user_id = $1
+          AND ml.status = 'missed'
+          AND ml.missed_alert_sent = FALSE
+        ORDER BY ml.scheduled_time ASC NULLS LAST;
+    `;
+  const result = await db.query(query, [patientId]);
+  return result.rows;
+};
+
+const markMedicationLogAlertSent = async (logId) => {
+  const result = await db.query(
+    "UPDATE medication_logs SET missed_alert_sent = TRUE WHERE log_id = $1 RETURNING *",
+    [logId],
+  );
   return result.rows[0];
 };
 
 const getPatientMedicationLogs = async (patientId) => {
   const query = `
-        SELECT ml.*, pm.dosage, pm.frequency, pm.start_date, pm.end_date, m.name AS medication_name, m.type AS medication_type
+        SELECT ml.*, pm.dosage, pm.frequency, pm.dosage_schedule, pm.start_date, pm.end_date, m.name AS medication_name, m.type AS medication_type
         FROM medication_logs ml
         LEFT JOIN patient_medications pm ON ml.patient_medication_id = pm.patient_medication_id
         LEFT JOIN medications m ON pm.medication_id = m.medication_id
@@ -136,6 +181,9 @@ module.exports = {
   updateMedication,
   deleteMedication,
   createMedicationLog,
+  markOverdueMedicationLogs,
+  getUnalertedMissedMedicationLogs,
+  markMedicationLogAlertSent,
   getPatientMedicationLogs,
   updateMedicationLogStatus,
 };

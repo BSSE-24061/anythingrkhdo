@@ -5,6 +5,12 @@ import { appointmentApi, medicationApi } from "../../utils/apiHelper";
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
 
+const DOSE_LABELS = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+};
+
 const MedicationLogs = () => {
   const user = getStoredUser();
   const [searchParams] = useSearchParams();
@@ -85,6 +91,10 @@ const MedicationLogs = () => {
                 }}>
                   {log.status?.toUpperCase()}
                 </span>
+                <p>
+                  {DOSE_LABELS[log.dose_period] || "Scheduled"} dose:{" "}
+                  {log.dose_dosage || log.dosage || "Dose not specified"}
+                </p>
                 <p>Scheduled: {log.scheduled_time ? new Date(log.scheduled_time).toLocaleString() : "N/A"}</p>
                 {log.status === "taken" && log.taken_at && (
                   <p style={{ color: "#44aa44", fontWeight: 600, marginTop: 4 }}>

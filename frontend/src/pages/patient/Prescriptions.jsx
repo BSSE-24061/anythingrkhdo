@@ -58,6 +58,16 @@ const Prescriptions = () => {
     });
   };
 
+  const formatDoseSchedule = (med) => {
+    if (med.dosage_schedule && typeof med.dosage_schedule === "object") {
+      return Object.entries(med.dosage_schedule)
+        .map(([period, dose]) => `${period.charAt(0).toUpperCase() + period.slice(1)}: ${dose}`)
+        .join(" • ");
+    }
+
+    return med.dosage || "Dose not specified";
+  };
+
   return (
     <div className="page-shell">
       <section className="hero-panel">
@@ -131,8 +141,7 @@ const Prescriptions = () => {
                             <div key={med.patient_medication_id} style={{ background: "var(--bg)", border: "1px solid var(--line)", padding: 16, borderRadius: 12 }}>
                               <strong style={{ display: "block", color: "var(--text)", fontSize: "1.1rem", marginBottom: 8 }}>{med.medication_name}</strong>
                               <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "0.9rem" }}>
-                                <span style={{ color: "var(--text)", fontWeight: 500 }}><strong>Dosage:</strong> {med.dosage}</span>
-                                <span style={{ color: "var(--text)", fontWeight: 500 }}><strong>Frequency:</strong> {med.frequency}</span>
+                                <span style={{ color: "var(--text)", fontWeight: 500 }}><strong>Schedule:</strong> {formatDoseSchedule(med)}</span>
                                 {(med.start_date || med.end_date) && (
                                   <span className="muted">
                                     {formatPrescriptionDate(med.start_date)} {med.end_date ? `→ ${formatPrescriptionDate(med.end_date)}` : ""}

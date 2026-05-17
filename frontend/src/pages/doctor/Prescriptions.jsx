@@ -5,6 +5,20 @@ import { appointmentApi, medicationApi, prescriptionApi } from "../../utils/apiH
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
 
+const DOSE_PERIODS = [
+  { key: "morning", label: "Morning" },
+  { key: "afternoon", label: "Afternoon" },
+  { key: "evening", label: "Evening" },
+];
+
+const emptyMedicationForm = {
+  medication_id: "",
+  medicationName: "",
+  dosage_schedule: { morning: "", afternoon: "", evening: "" },
+  start_date: "",
+  end_date: "",
+};
+
 const Prescriptions = () => {
   const user = getStoredUser();
   const [searchParams] = useSearchParams();
@@ -16,7 +30,7 @@ const Prescriptions = () => {
   const [selectedPrescription, setSelectedPrescription] = useState("");
   const [loading, setLoading] = useState(true);
   const [masterForm, setMasterForm] = useState({ diagnosis: "", diagnosis_notes: "", symptoms_notes: "", follow_up_date: "" });
-  const [medForm, setMedForm] = useState({ medication_id: "", medicationName: "", dosage: "", frequency: "", start_date: "", end_date: "" });
+  const [medForm, setMedForm] = useState(emptyMedicationForm);
   const [showRequestMedication, setShowRequestMedication] = useState(false);
   const [requestMedForm, setRequestMedForm] = useState({ name: "", type: "", description: "" });
 
@@ -96,6 +110,16 @@ const Prescriptions = () => {
     });
   };
 
+  const formatDoseSchedule = (item) => {
+    if (item.dosage_schedule && typeof item.dosage_schedule === "object") {
+      return Object.entries(item.dosage_schedule)
+        .map(([period, dose]) => `${period.charAt(0).toUpperCase() + period.slice(1)}: ${dose}`)
+        .join(" • ");
+    }
+
+    return item.dosage || "Dosage not specified";
+  };
+
   const createPrescription = async (event) => {
     event.preventDefault();
 
@@ -157,6 +181,15 @@ const Prescriptions = () => {
       }
     }
 
+    const dosageSchedule = Object.fromEntries(
+      Object.entries(medForm.dosage_schedule).filter(([, value]) => value.trim()),
+    );
+
+    if (Object.keys(dosageSchedule).length === 0) {
+      alert("Please enter dosage for at least one timing.");
+      return;
+    }
+
     let medicationCreated = false;
 
     try {
@@ -164,8 +197,7 @@ const Prescriptions = () => {
         prescription_id: selectedPrescription,
         patient_user_id: selectedPatient,
         medication_id: medForm.medication_id,
-        dosage: medForm.dosage,
-        frequency: medForm.frequency,
+        dosage_schedule: dosageSchedule,
         start_date: medForm.start_date || null,
         end_date: medForm.end_date || null,
       });
@@ -183,7 +215,7 @@ const Prescriptions = () => {
       console.error(error);
     } finally {
       if (medicationCreated) {
-        setMedForm({ medication_id: "", medicationName: "", dosage: "", frequency: "", start_date: "", end_date: "" });
+        setMedForm(emptyMedicationForm);
       }
     }
   };
@@ -295,9 +327,28 @@ const Prescriptions = () => {
               </div>
             )}
 
-            <div className="form-columns">
-              <input value={medForm.dosage} onChange={(event) => setMedForm((current) => ({ ...current, dosage: event.target.value }))} placeholder="Dosage" required />
-              <input value={medForm.frequency} onChange={(event) => setMedForm((current) => ({ ...current, frequency: event.target.value }))} placeholder="Frequency" required />
+            <div style={{ display: "grid", gap: 10 }}>
+              <strong>Dosage by timing</strong>
+              <div className="form-columns">
+                {DOSE_PERIODS.map((period) => (
+                  <label key={period.key}>
+                    {period.label}
+                    <input
+                      value={medForm.dosage_schedule[period.key]}
+                      onChange={(event) =>
+                        setMedForm((current) => ({
+                          ...current,
+                          dosage_schedule: {
+                            ...current.dosage_schedule,
+                            [period.key]: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder={`Dose for ${period.label.toLowerCase()}`}
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="form-columns">
               <input type="date" value={medForm.start_date} onChange={(event) => setMedForm((current) => ({ ...current, start_date: event.target.value }))} />
@@ -339,7 +390,7 @@ const Prescriptions = () => {
               {prescriptionMedications.map((item) => (
                 <div className="list-item" key={item.patient_medication_id}>
                   <strong>{item.medication_name}</strong>
-                  <span>{item.dosage} • {item.frequency}</span>
+                  <span>{formatDoseSchedule(item)}</span>
                   <p className="muted">{item.start_date || ""} {item.end_date ? `→ ${item.end_date}` : ""}</p>
                 </div>
               ))}

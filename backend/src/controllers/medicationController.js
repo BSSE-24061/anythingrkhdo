@@ -1,5 +1,42 @@
 const Medication = require("../models/medicationModel");
 const Notification = require("../models/notificationModel");
+const Vital = require("../models/vitalModel");
+const { DOSE_SLOTS } = require("../constants/doseSlots");
+
+const formatDosePeriod = (period) => DOSE_SLOTS[period]?.label || "Scheduled";
+
+const createMissedDoseAlerts = async (patientId) => {
+  const missedLogs = await Medication.getUnalertedMissedMedicationLogs(patientId);
+
+  for (const log of missedLogs) {
+    const doseLabel = formatDosePeriod(log.dose_period);
+    const medicationName = log.medication_name || "your medication";
+    const dosageText = log.dose_dosage || log.dosage || "prescribed dose";
+
+    try {
+      await Notification.createNotification({
+        user_id: log.patient_user_id,
+        type: "alert",
+        title: `${doseLabel} medication missed`,
+        body: `You missed ${dosageText} of ${medicationName} for the ${doseLabel.toLowerCase()} dose.`,
+        reference_id: log.log_id,
+        reference_type: "medication_log",
+      });
+
+      await Vital.createAlert({
+        patient_user_id: log.patient_user_id,
+        vital_id: null,
+        alert_type: "Missed Medication",
+        message: `You missed ${dosageText} of ${medicationName} for the ${doseLabel.toLowerCase()} dose.`,
+        severity: "medium",
+      });
+
+      await Medication.markMedicationLogAlertSent(log.log_id);
+    } catch (error) {
+      console.error("Error creating missed medication alert:", error.message);
+    }
+  }
+};
 
 const getMedications = async (req, res) => {
   try {
@@ -96,6 +133,9 @@ const createMedicationLog = async (req, res) => {
 
 const getPatientMedicationLogs = async (req, res) => {
   try {
+    await Medication.markOverdueMedicationLogs(req.params.patientId);
+    await createMissedDoseAlerts(req.params.patientId);
+
     const logs = await Medication.getPatientMedicationLogs(
       req.params.patientId,
     );
@@ -165,12 +205,14 @@ const updateMedicationLogStatus = async (req, res) => {
         await Notification.createNotification({
           user_id: log.patient_user_id,
           type: "alert",
-          title: "Medication dose missed",
+          title: `${formatDosePeriod(log.dose_period)} medication missed`,
           body: `A scheduled dose was marked as missed. Review your medications and contact your clinician if needed.`,
           reference_id: log.log_id,
           reference_type: "medication_log",
         });
       }
+
+      await Medication.markMedicationLogAlertSent(log.log_id);
     }
 
     res
