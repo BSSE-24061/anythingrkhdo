@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { vitalApi, getErrorMessage } from "../../utils/apiHelper";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { vitalApi, medicationApi, getErrorMessage } from "../../utils/apiHelper";
 import { getStoredUser } from "../../utils/session";
 
 const Alerts = () => {
@@ -8,22 +8,93 @@ const Alerts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadAlerts = async () => {
+  // Tracks which alert IDs have already triggered a sound this session
+  const playedAlertsRef = useRef(new Set());
+
+  const playAlertSound = useCallback(() => {
+    try {
+      // Using a reliable notification sound URL
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.loop = true;
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn("Autoplay prevented. Sound will play after your next click on the page.", err);
+        });
+      }
+
+      // Stop after 3 seconds
+      setTimeout(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }, 3000);
+    } catch (e) {
+      console.error("Audio error:", e);
+    }
+  }, []);
+
+  const loadAlerts = useCallback(async (isInitial = false) => {
     if (!user?.id) return;
     try {
-      setLoading(true);
-      const response = await vitalApi.alerts(user.id);
-      setAlerts(response.data || []);
+      if (isInitial) setLoading(true);
+
+      const [alertsRes, logsRes] = await Promise.all([
+        vitalApi.getAlerts(user.id),
+        medicationApi.byPatientLogs(user.id)
+      ]);
+
+      const data = alertsRes.data || [];
+      const logsData = Array.isArray(logsRes.data) ? logsRes.data : [];
+      const now = new Date();
+
+      // Generate reminders for pending meds that were missed
+      const medicationAlerts = logsData
+        .filter(log => log.status === "pending" && log.scheduled_time && new Date(log.scheduled_time) < now)
+        .map(log => ({
+          alert_id: `med-${log.log_id}`,
+          alert_type: "Medication Reminder 💊",
+          message: `Scheduled dose for ${log.medication_name} (${log.dosage}) was missed. Please check your medication logs.`,
+          triggered_at: log.scheduled_time,
+          is_read: false
+        }));
+
+      const combined = [...medicationAlerts, ...data];
+
+      // Check if there are any unread alerts to trigger the sound
+      const newUnreadAlerts = combined.filter(a =>
+        !a.is_read && !playedAlertsRef.current.has(a.alert_id || a.id)
+      );
+
+      if (newUnreadAlerts.length > 0) {
+        playAlertSound();
+        newUnreadAlerts.forEach(a => playedAlertsRef.current.add(a.alert_id || a.id));
+      }
+
+      setAlerts(combined);
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load health alerts."));
     } finally {
       setLoading(false);
     }
+  }, [user?.id, playAlertSound]);
+
+  const handleMarkAsRead = async () => {
+    if (!user?.id) return;
+    try {
+      await vitalApi.markAlertsRead(user.id);
+      loadAlerts(false); // Refresh list to clear badges
+    } catch (err) {
+      console.error("Failed to mark alerts as read", err);
+    }
   };
 
   useEffect(() => {
-    loadAlerts();
-  }, []);
+    loadAlerts(true);
+    // Poll for new alerts every 10 seconds
+    const interval = setInterval(() => loadAlerts(false), 10000);
+    return () => clearInterval(interval);
+  }, [loadAlerts]);
 
   return (
     <div className="page-shell">
@@ -43,7 +114,10 @@ const Alerts = () => {
         <section className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <h3 style={{ margin: 0 }}>Recent Notifications</h3>
-            <button className="btn-ghost small" onClick={loadAlerts}>Refresh</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn-ghost small" onClick={() => loadAlerts(false)}>Refresh</button>
+              <button className="btn-primary small" onClick={handleMarkAsRead}>Clear Badges</button>
+            </div>
           </div>
 
           <div className="list-stack">
@@ -64,8 +138,8 @@ const Alerts = () => {
                 }}
               >
                 <div style={{ fontSize: 24 }}>
-                  {alert.alert_type?.toLowerCase().includes("vital") ? "📊" : 
-                   alert.alert_type?.toLowerCase().includes("lab") ? "🧪" : "🚨"}
+                  {alert.alert_type?.toLowerCase().includes("vital") ? "📊" :
+                    alert.alert_type?.toLowerCase().includes("lab") ? "🧪" : "🚨"}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

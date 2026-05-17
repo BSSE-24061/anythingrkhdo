@@ -13,15 +13,26 @@ const createForumPost = async (postData) => {
   return result.rows[0];
 };
 
-const getForumPosts = async () => {
+const getForumPosts = async (userId = null) => {
   const query = `
-        SELECT fp.*, u.full_name AS author_name, u.role AS author_role
+        SELECT fp.*, u.full_name AS author_name, u.role AS author_role,
+               COALESCE(like_counts.likes_count, 0) AS likes_count,
+               EXISTS(
+                 SELECT 1 FROM forum_post_likes fl
+                 WHERE fl.post_id = fp.post_id
+                   AND fl.user_id = $1
+               ) AS user_has_liked
         FROM forum_posts fp
         JOIN users u ON fp.user_id = u.user_id
+        LEFT JOIN (
+          SELECT post_id, COUNT(*) AS likes_count
+          FROM forum_post_likes
+          GROUP BY post_id
+        ) AS like_counts ON like_counts.post_id = fp.post_id
         WHERE fp.status = 'active'
         ORDER BY fp.created_at DESC;
     `;
-  const result = await db.query(query);
+  const result = await db.query(query, [userId]);
   return result.rows;
 };
 
@@ -61,8 +72,45 @@ const getPostReplies = async (postId) => {
   return result.rows;
 };
 
+const checkUserLikedPost = async (postId, userId) => {
+  const query = `
+    SELECT COUNT(*) AS like_count
+    FROM forum_post_likes
+    WHERE post_id = $1 AND user_id = $2;
+  `;
+  const result = await db.query(query, [postId, userId]);
+  return result.rows[0].like_count > 0;
+};
+
+const likePost = async (postId, userId) => {
+  const alreadyLiked = await checkUserLikedPost(postId, userId);
+  if (alreadyLiked) {
+    const error = new Error("User has already liked this post");
+    error.code = "23505";
+    throw error;
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const query = `
+          INSERT INTO forum_post_likes (post_id, user_id)
+          VALUES ($1, $2)
+          RETURNING *;
+      `;
+    const result = await client.query(query, [postId, userId]);
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const incrementViewCount = async (postId) => {
-  const query = `UPDATE forum_posts SET views_count = views_count + 1 WHERE post_id = $1;`;
+  const query = `UPDATE forum_posts SET views_count = COALESCE(views_count, 0) + 1 WHERE post_id = $1;`;
   await db.query(query, [postId]);
 };
 
@@ -111,6 +159,7 @@ module.exports = {
   getForumPostById,
   addReply,
   getPostReplies,
+  likePost,
   incrementViewCount,
   reportPost,
   getReportedPosts,

@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { clearSession, getStoredUser } from "../utils/session";
+import { chatApi } from "../utils/apiHelper";
 
 const DOCTOR_NAV = [
   ["Dashboard", "/doctor/dashboard"],
@@ -20,6 +21,25 @@ const DoctorRouteLayout = () => {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchBadges = async () => {
+      try {
+        const chatRes = await chatApi.inbox(user.id);
+        const unreadRooms = (chatRes.data || []).filter(r => r.unread_count > 0).length;
+        setUnreadChats(unreadRooms);
+      } catch (err) {
+        console.error("Failed to load badges:", err);
+      }
+    };
+
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 15000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const handleLogout = () => {
     clearSession();
@@ -124,9 +144,15 @@ const DoctorRouteLayout = () => {
                     height: 10,
                     borderRadius: 999,
                     background: active ? "#2563eb" : "#cbd5e1",
+                    flexShrink: 0,
                   }}
                 />
-                {label}
+                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+                {label === "Chat" && unreadChats > 0 && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 6px", borderRadius: 10, display: "grid", placeItems: "center" }}>
+                    {unreadChats}
+                  </span>
+                )}
               </Link>
             );
           })}

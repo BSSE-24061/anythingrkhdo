@@ -104,12 +104,9 @@ const AdminBlogApproval = () => {
           ) : pendingArticles.length === 0 ? (
             <p className="muted">No pending articles for review.</p>
           ) : (
-            <div className="list-stack">
+            <div className="blog-carousel">
               {pendingArticles.map((article) => (
-                <div key={article.article_id} className="list-item" style={{ 
-                  padding: "20px",
-                  borderLeft: "4px solid #ffc107"
-                }}>
+                <div key={article.article_id} className="blog-card" style={{ padding: "20px", minWidth: 360, maxWidth: 420 }}>
                   <div style={{ marginBottom: "12px" }}>
                     <h3>{article.title}</h3>
                     <p className="muted">

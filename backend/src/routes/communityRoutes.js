@@ -14,6 +14,9 @@ router.get("/posts/:postId", communityController.getPost);
 // POST /api/community/replies - Reply to a post
 router.post("/replies", communityController.replyToPost);
 
+// POST /api/community/likes - Like a forum post
+router.post("/likes", communityController.likePost);
+
 // GET /api/community/posts/:postId/replies - Get replies for a specific post
 router.get("/posts/:postId/replies", communityController.loadReplies);
 
