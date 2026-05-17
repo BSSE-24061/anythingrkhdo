@@ -383,24 +383,55 @@ const PatientDashboard = () => {
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#0f172a", fontWeight: 950, fontSize: 13 }}>
-                        {med.medication_name || "Lisinopril"}
+                        {med.medication_name || "Medication"}
                       </div>
                       <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12, marginTop: 6 }}>
-                        {med.dosage || "10mg"} • {med.frequency || "Morning"}
+                        {med.dosage || "1 dose"} • {med.frequency || "Scheduled"}
                       </div>
                     </div>
 
-                    <span
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontWeight: 900,
-                        fontSize: 11,
-                        ...(med.status === "taken" ? STATUS_PILL_STYLES.taken : STATUS_PILL_STYLES.upcoming),
-                      }}
-                    >
-                      {med.status || "upcoming"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          fontWeight: 900,
+                          fontSize: 11,
+                          ...(med.status === "taken" ? STATUS_PILL_STYLES.taken : STATUS_PILL_STYLES.upcoming),
+                        }}
+                      >
+                        {med.status || "upcoming"}
+                      </span>
+                      {med.status === "pending" && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await medicationApi.updateLogStatus(med.log_id, "taken");
+                              // Update the state locally to reflect the change
+                              setMedicationLogs(prev => 
+                                prev.map(log => 
+                                  log.log_id === med.log_id ? { ...log, status: "taken", taken_at: new Date() } : log
+                                )
+                              );
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          style={{
+                            background: "#22c55e",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Mark Taken
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (

@@ -32,15 +32,10 @@ const MedicationLogs = () => {
     loadLogs();
   }, [user?.id]);
 
-  const mark = async (id, status) => {
+  const mark = async (logId, status) => {
     if (!user?.id) return;
     try {
-      await medicationApi.log({
-        patient_medication_id: id,
-        patient_user_id: user.id,
-        status,
-        taken_at: new Date(),
-      });
+      await medicationApi.updateLogStatus(logId, status);
       loadLogs();
     } catch (err) {
       alert(getErrorMessage(err, "Failed to update medication log."));
@@ -113,7 +108,7 @@ const MedicationLogs = () => {
                     <div style={{ display: "flex", gap: 10 }}>
                       <button 
                         className="btn-main small" 
-                        onClick={() => mark(l.patient_medication_id, "taken")}
+                        onClick={() => mark(l.log_id, "taken")}
                         style={{ background: "#22c55e", boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)" }}
                         disabled={l.status === "taken"}
                       >
@@ -121,7 +116,7 @@ const MedicationLogs = () => {
                       </button>
                       <button 
                         className="btn-ghost small" 
-                        onClick={() => mark(l.patient_medication_id, "missed")}
+                        onClick={() => mark(l.log_id, "missed")}
                         style={{ color: "#ef4444", borderColor: "#fecaca" }}
                         disabled={l.status === "taken"}
                       >
