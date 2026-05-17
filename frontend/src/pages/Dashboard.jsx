@@ -13,6 +13,7 @@ import {
   forumApi,
 } from "../utils/apiHelper";
 import { getStoredUser } from "../utils/session";
+import { normalizeSpecializations } from "../utils/specializations";
 
 const Dashboard = () => {
   const user = useMemo(() => getStoredUser(), []);
@@ -77,7 +78,7 @@ const Dashboard = () => {
 
       try {
         const specResponse = await userApi.getAllSpecializations();
-        setSpecializations(specResponse.data || []);
+        setSpecializations(normalizeSpecializations(specResponse.data));
 
         const alertsResponse = await vitalApi.getAlerts(user.id);
         setAlerts(alertsResponse.data || []);
@@ -266,11 +267,11 @@ const Dashboard = () => {
               {specializations.length > 0 ? (
                 specializations.map((spec) => (
                   <Link
-                    key={spec}
-                    to={`/specializations/${encodeURIComponent(spec)}`}
+                    key={spec.name}
+                    to={`/specializations/${encodeURIComponent(spec.name)}`}
                     className="spec-link"
                   >
-                    {spec}
+                    {spec.name}
                   </Link>
                 ))
               ) : (
