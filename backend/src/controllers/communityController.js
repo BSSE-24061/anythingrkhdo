@@ -22,15 +22,11 @@ const createPost = async (req, res) => {
 
 const getFeed = async (req, res) => {
   try {
-<<<<<<< HEAD
     let userId = req.query.userId;
     if (!userId || userId === "undefined" || userId === "null") {
       userId = null;
     }
     const posts = await Community.getForumPosts(userId);
-=======
-    const posts = await Community.getForumPosts();
->>>>>>> parent of 42a0ed9 (push)
     res.status(200).json(posts);
   } catch (error) {
     console.error("Error fetching feed:", error.message);
@@ -84,7 +80,6 @@ const loadReplies = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 const likePost = async (req, res) => {
   try {
     const { post_id, user_id } = req.body;
@@ -104,8 +99,7 @@ const likePost = async (req, res) => {
   }
 };
 
-=======
->>>>>>> parent of 42a0ed9 (push)
+
 const submitReport = async (req, res) => {
   try {
     const { post_id, reported_by, user_id, reason, description } = req.body;
@@ -169,10 +163,7 @@ module.exports = {
   getPost,
   replyToPost,
   loadReplies,
-<<<<<<< HEAD
   likePost,
-=======
->>>>>>> parent of 42a0ed9 (push)
   submitReport,
   getReports,
   updatePostStatus,

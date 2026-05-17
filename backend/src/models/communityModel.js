@@ -1,6 +1,4 @@
 const db = require("../config/db");
-
-<<<<<<< HEAD
 let isInitialized = false;
 const initForumTables = async () => {
   if (isInitialized) return;
@@ -29,8 +27,6 @@ const initForumTables = async () => {
   }
 };
 
-=======
->>>>>>> parent of 42a0ed9 (push)
 const createForumPost = async (postData) => {
   const { user_id, category, title, body } = postData;
 
@@ -66,17 +62,6 @@ const getForumPosts = async (userId = null) => {
         ORDER BY fp.created_at DESC;
     `;
   const result = await db.query(query, [userId]);
-=======
-const getForumPosts = async () => {
-  const query = `
-        SELECT fp.*, u.full_name AS author_name, u.role AS author_role
-        FROM forum_posts fp
-        JOIN users u ON fp.user_id = u.user_id
-        WHERE fp.status = 'active'
-        ORDER BY fp.created_at DESC;
-    `;
-  const result = await db.query(query);
->>>>>>> parent of 42a0ed9 (push)
   return result.rows;
 };
 

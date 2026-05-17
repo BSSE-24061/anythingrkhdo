@@ -79,14 +79,11 @@ const createMedicationLog = async (req, res) => {
     // Get the user role from the request (should be set by auth middleware)
     const userRole = req.user?.role || req.body.user_role;
 
-<<<<<<< HEAD
-=======
     // Doctors cannot create medication logs - only patients or admins can
     if (userRole === "doctor") {
       return res.status(403).json({ error: "Doctors cannot create or modify patient medication logs" });
     }
 
->>>>>>> parent of 42a0ed9 (push)
     if (!patient_user_id) {
       return res.status(400).json({ error: "Patient ID is required" });
     }
