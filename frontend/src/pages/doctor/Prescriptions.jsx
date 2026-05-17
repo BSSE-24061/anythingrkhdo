@@ -99,6 +99,17 @@ const Prescriptions = () => {
   const createPrescription = async (event) => {
     event.preventDefault();
 
+    if (masterForm.follow_up_date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const followUp = new Date(masterForm.follow_up_date);
+      followUp.setHours(0, 0, 0, 0);
+      if (followUp < today) {
+        alert("Follow-up date cannot be before the current date.");
+        return;
+      }
+    }
+
     try {
       const response = await prescriptionApi.createMaster({
         patient_user_id: selectedPatient,
@@ -133,6 +144,17 @@ const Prescriptions = () => {
     if (!medForm.medication_id) {
       alert("Please select a valid medication from the search list.");
       return;
+    }
+
+    if (medForm.start_date && medForm.end_date) {
+      const start = new Date(medForm.start_date);
+      const end = new Date(medForm.end_date);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      if (end < start) {
+        alert("Ending date cannot be before the starting date.");
+        return;
+      }
     }
 
     let medicationCreated = false;
@@ -212,7 +234,7 @@ const Prescriptions = () => {
             <textarea rows="3" value={masterForm.symptoms_notes} onChange={(event) => setMasterForm((current) => ({ ...current, symptoms_notes: event.target.value }))} placeholder="Symptoms notes" />
             <label>
               Follow-up Date
-              <input type="date" value={masterForm.follow_up_date} onChange={(event) => setMasterForm((current) => ({ ...current, follow_up_date: event.target.value }))} />
+              <input type="date" min={new Date().toISOString().split("T")[0]} value={masterForm.follow_up_date} onChange={(event) => setMasterForm((current) => ({ ...current, follow_up_date: event.target.value }))} />
             </label>
             <button type="submit" className="btn-main">Create Prescription</button>
           </form>
@@ -279,7 +301,7 @@ const Prescriptions = () => {
             </div>
             <div className="form-columns">
               <input type="date" value={medForm.start_date} onChange={(event) => setMedForm((current) => ({ ...current, start_date: event.target.value }))} />
-              <input type="date" value={medForm.end_date} onChange={(event) => setMedForm((current) => ({ ...current, end_date: event.target.value }))} />
+              <input type="date" min={medForm.start_date || ""} value={medForm.end_date} onChange={(event) => setMedForm((current) => ({ ...current, end_date: event.target.value }))} />
             </div>
             <button type="submit" className="btn-soft">Add Medication + Log</button>
           </form>

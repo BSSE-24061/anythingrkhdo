@@ -110,15 +110,20 @@ const getPatientMedicationLogs = async (patientId) => {
 
 const updateMedicationLogStatus = async (logId, status, takenAt) => {
   const query = `
-        UPDATE medication_logs
-        SET status = $1::medication_status,
-            taken_at = CASE
-              WHEN $1::medication_status = 'taken' THEN COALESCE($2::timestamptz, NOW())
-              WHEN $1::medication_status = 'missed' THEN NULL
-              ELSE taken_at
-            END
-        WHERE log_id = $3
-        RETURNING *;
+        WITH updated_log AS (
+            UPDATE medication_logs
+            SET status = $1::medication_status,
+                taken_at = CASE
+                  WHEN $1::medication_status = 'taken' THEN COALESCE($2::timestamptz, NOW())
+                  WHEN $1::medication_status = 'missed' THEN NULL
+                  ELSE taken_at
+                END
+            WHERE log_id = $3
+            RETURNING *
+        )
+        SELECT ul.*, pm.start_date, pm.end_date
+        FROM updated_log ul
+        LEFT JOIN patient_medications pm ON ul.patient_medication_id = pm.patient_medication_id;
     `;
   const result = await db.query(query, [status, takenAt || null, logId]);
   return result.rows[0];

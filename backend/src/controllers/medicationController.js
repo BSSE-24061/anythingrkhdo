@@ -137,14 +137,40 @@ const updateMedicationLogStatus = async (req, res) => {
     }
 
     if (status === "missed") {
-      await Notification.createNotification({
-        user_id: log.patient_user_id,
-        type: "alert",
-        title: "Medication dose missed",
-        body: `A scheduled dose was marked as missed. Review your medications and contact your clinician if needed.`,
-        reference_id: log.log_id,
-        reference_type: "medication_log",
-      });
+      let shouldAlert = false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (log.start_date || log.end_date) {
+        const checkDates = [];
+        if (log.start_date) {
+          const sd = new Date(log.start_date);
+          sd.setHours(0, 0, 0, 0);
+          checkDates.push(sd.getTime());
+        }
+        if (log.end_date) {
+          const ed = new Date(log.end_date);
+          ed.setHours(0, 0, 0, 0);
+          checkDates.push(ed.getTime());
+        }
+
+        if (checkDates.includes(today.getTime())) {
+          shouldAlert = true;
+        }
+      } else {
+        shouldAlert = true;
+      }
+
+      if (shouldAlert) {
+        await Notification.createNotification({
+          user_id: log.patient_user_id,
+          type: "alert",
+          title: "Medication dose missed",
+          body: `A scheduled dose was marked as missed. Review your medications and contact your clinician if needed.`,
+          reference_id: log.log_id,
+          reference_type: "medication_log",
+        });
+      }
     }
 
     res
