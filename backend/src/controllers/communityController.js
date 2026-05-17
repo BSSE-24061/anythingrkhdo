@@ -159,6 +159,7 @@ module.exports = {
   getPost,
   replyToPost,
   loadReplies,
+  likePost,
   submitReport,
   getReports,
   updatePostStatus,
