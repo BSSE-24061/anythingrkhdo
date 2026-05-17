@@ -135,6 +135,7 @@ export const notificationApi = {
     api.get(`/notifications/user/${userId}/unread-count`),
   list: (userId) => api.get(`/notifications/user/${userId}`),
   markAllRead: (userId) => api.patch(`/notifications/user/${userId}/read-all`),
+  markAsRead: (notificationId) => api.patch(`/notifications/${notificationId}/read`),
 };
 
 export default api;

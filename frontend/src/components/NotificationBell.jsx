@@ -51,9 +51,7 @@ const NotificationBell = () => {
 
     const markAllAsRead = async () => {
         try {
-            for (const notif of notifications.filter(n => !n.is_read)) {
-                await notificationApi.markAsRead(notif.notification_id);
-            }
+            await notificationApi.markAllRead(user.id);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             setUnreadCount(0);
         } catch (error) {

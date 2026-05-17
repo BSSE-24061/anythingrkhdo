@@ -10,6 +10,7 @@ const PATIENT_NAV = [
   ["Appointments", "/appointments"],
   ["Specializations", "/specializations"],
   ["Medical History", "/history"],
+  ["Prescriptions", "/prescriptions"],
   ["Vitals", "/vitals"],
   ["Medication Logs", "/medications"],
   ["Blogs", "/blogs"],

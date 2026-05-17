@@ -40,6 +40,7 @@ import Specializations from "./pages/patient/Specializations";
 import DoctorsBySpecialization from "./pages/doctor/DoctorsBySpecialization";
 import Consultant from "./pages/patient/Consultant";
 import MedicalHistory from "./pages/patient/MedicalHistory";
+import Prescriptions from "./pages/patient/Prescriptions";
 import Vitals from "./pages/patient/Vitals";
 import MedicationLogs from "./pages/patient/MedicationLogs";
 import Blogs from "./pages/patient/Blogs";
@@ -248,6 +249,17 @@ function App() {
             <ProtectedRoute>
               <PatientLayout>
                 <MedicalHistory />
+              </PatientLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/prescriptions"
+          element={
+            <ProtectedRoute>
+              <PatientLayout>
+                <Prescriptions />
               </PatientLayout>
             </ProtectedRoute>
           }

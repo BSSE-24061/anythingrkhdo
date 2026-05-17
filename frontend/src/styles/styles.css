@@ -1,37 +1,23 @@
 :root {
-  /* Modern Healthcare UI - Gray Background & Teal Accents */
-  --bg: #f8fafc; /* Professional Healthcare Slate background */
-  /* Light Blue-Gray background - professional & clean */
+  /* Modern Healthcare UI */
+  --bg: #f8fafc;
   --panel: #ffffff;
-  /* Pure White panels - content containers */
-  --panel-strong: #f8fbfd;
-  /* Subtle gray - secondary panels */
-  --text: #0b8a8a;
-  /* Teal - primary text (healing & trust) */
-  --muted: #4a9fa5;
-  /* Medium Teal - secondary text */
-  --line: #d4e8eb;
-  /* Light Teal - borders & dividers */
+  --panel-strong: #f1f5f9;
+  --text: #0f172a; /* Slate 900 for readable text */
+  --muted: #64748b; /* Slate 500 for secondary text */
+  --line: #e2e8f0; /* Slate 200 for borders */
 
   /* Healthcare Primary Colors */
-  --accent: #0056b3;
-  /* Deep Blue - buttons & CTAs */
-  --accent-2: #5dade2;
-  /* Bright Blue - accents */
-  --accent-green: #82e0aa;
-  /* Soft Green - success & wellness */
-  --accent-yellow: #fbc02d;
-  /* Soft Yellow - warmth */
-  --warning: #f39c12;
-  /* Amber - alerts */
+  --accent: #0284c7; /* Clinical Sky Blue */
+  --accent-2: #38bdf8;
+  --accent-green: #10b981;
+  --accent-yellow: #f59e0b;
+  --warning: #f97316;
 
   /* Semantics */
   --danger: #ef4444;
-  /* Red - urgent */
   --success: #22c55e;
-  /* Green - confirmations */
-  --shadow: 0 2px 12px rgba(11, 138, 138, 0.1);
-  /* Teal-tinted subtle shadow */
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
 * {
