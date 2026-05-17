@@ -15,21 +15,64 @@ const Blogs = () => {
   const [liking, setLiking] = useState({});
   const [notice, setNotice] = useState("");
 
+  const appendCommentToArticle = (articles, articleId, comment) =>
+    articles.map((article) => {
+      if (article.article_id !== articleId) return article;
+
+      const currentComments = Array.isArray(article.comments) ? article.comments : [];
+      return {
+        ...article,
+        comments: [...currentComments, comment],
+        comments_count: Number(article.comments_count || currentComments.length) + 1,
+      };
+    });
+
+  const hydrateArticlesWithComments = async (articles) => {
+    const articleList = Array.isArray(articles) ? articles : [];
+    if (!articleList.length) return articleList;
+
+    const details = await Promise.all(
+      articleList.map(async (article) => {
+        try {
+          const response = await blogApi.getArticle(article.article_id, user.id);
+          const comments = Array.isArray(response.data?.comments) ? response.data.comments : [];
+          return {
+            ...article,
+            comments,
+            comments_count: comments.length,
+          };
+        } catch (error) {
+          console.error(error);
+          return article;
+        }
+      })
+    );
+
+    return details;
+  };
+
   const load = async () => {
     try {
       const [feedResponse, pendingResponse, bookmarksResponse] = await Promise.all([
-        blogApi.feed(user.id), 
+        blogApi.feed(user.id),
         blogApi.pending(user.id),
         blogApi.bookmarks(user.id)
       ]);
-      setFeed(feedResponse.data || []);
-      setPending(pendingResponse.data || []);
-      setBookmarks(bookmarksResponse.data || []);
+
+      const [feedArticles, pendingArticles, bookmarkedArticles] = await Promise.all([
+        hydrateArticlesWithComments(feedResponse.data || []),
+        hydrateArticlesWithComments(pendingResponse.data || []),
+        hydrateArticlesWithComments(bookmarksResponse.data || []),
+      ]);
+
+      setFeed(feedArticles);
+      setPending(pendingArticles);
+      setBookmarks(bookmarkedArticles);
       setNotice("");
-      
+
       // Build set of articles already liked by this user
       const likedIds = new Set();
-      const allArticles = [...(feedResponse.data || []), ...(pendingResponse.data || []), ...(bookmarksResponse.data || [])];
+      const allArticles = [...feedArticles, ...pendingArticles, ...bookmarkedArticles];
       allArticles.forEach(article => {
         if (article.user_has_liked) {
           likedIds.add(article.article_id);
@@ -89,12 +132,25 @@ const Blogs = () => {
   };
 
   const commentArticle = async (articleId) => {
-    const body = commentText[articleId];
+    const body = commentText[articleId]?.trim();
     if (!body) return;
     try {
-      await blogApi.comment({ article_id: articleId, user_id: user.id, body });
+      const response = await blogApi.comment({ article_id: articleId, user_id: user.id, body });
+      const savedComment = {
+        comment_id: `temp-${Date.now()}`,
+        article_id: articleId,
+        user_id: user.id,
+        body,
+        commenter_name: user.name || "You",
+        created_at: new Date().toISOString(),
+        ...(response.data?.comment || {}),
+      };
+
       setCommentText((current) => ({ ...current, [articleId]: "" }));
-      load();
+      setFeed((current) => appendCommentToArticle(current, articleId, savedComment));
+      setPending((current) => appendCommentToArticle(current, articleId, savedComment));
+      setBookmarks((current) => appendCommentToArticle(current, articleId, savedComment));
+      setNotice("Comment added.");
     } catch (error) {
       console.error(error);
     }
@@ -153,7 +209,10 @@ const Blogs = () => {
           </div>
 
           <div className="blog-carousel">
-            {items.length ? items.map((article) => (
+            {items.length ? items.map((article) => {
+              const articleComments = Array.isArray(article.comments) ? article.comments : [];
+
+              return (
               <div key={article.article_id} className="blog-card" style={{ padding: 24, minWidth: 340, maxWidth: 420 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "center" }}>
                   <h4 style={{ margin: 0, fontSize: "1.3rem", color: "#0f172a" }}>{article.title}</h4>
@@ -168,10 +227,10 @@ const Blogs = () => {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-                  <button 
+                  <button
                     onClick={() => likeArticle(article.article_id)}
                     disabled={userLikedArticles.has(article.article_id) || liking[article.article_id]}
-                    style={{ 
+                    style={{
                       padding: "8px 16px", borderRadius: 10, border: "none", fontWeight: 700,
                       background: userLikedArticles.has(article.article_id) ? "#fef2f2" : "#f1f5f9",
                       color: userLikedArticles.has(article.article_id) ? "#ef4444" : "#64748b",
@@ -181,12 +240,36 @@ const Blogs = () => {
                   >
                     {liking[article.article_id] ? "Liking..." : (userLikedArticles.has(article.article_id) ? "❤️ Liked" : "🤍 Like")}
                   </button>
-                  <button 
+                  <button
                     onClick={() => bookmarkArticle(article.article_id)}
                     style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#f1f5f9", color: "#64748b", fontWeight: 700, cursor: "pointer" }}
                   >
                     🔖 Bookmark
                   </button>
+                </div>
+
+                <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16, marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <strong style={{ color: "#0f172a", fontSize: "0.95rem" }}>Comments</strong>
+                    <span className="muted" style={{ fontSize: "0.85rem" }}>{article.comments_count || articleComments.length}</span>
+                  </div>
+                  {articleComments.length ? (
+                    <div style={{ display: "grid", gap: 10, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                      {articleComments.map((comment) => (
+                        <div key={comment.comment_id} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+                            <strong style={{ color: "#334155", fontSize: "0.9rem" }}>{comment.commenter_name || "Reader"}</strong>
+                            <span className="muted" style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                              {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ""}
+                            </span>
+                          </div>
+                          <p style={{ color: "#475569", margin: 0, lineHeight: 1.5, fontSize: "0.92rem", whiteSpace: "pre-wrap" }}>{comment.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>No comments yet.</p>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", gap: 12, borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
@@ -199,7 +282,8 @@ const Blogs = () => {
                   <button className="btn-main" onClick={() => commentArticle(article.article_id)} style={{ borderRadius: 12, padding: "0 24px" }}>Post</button>
                 </div>
               </div>
-            )) : <div style={{ padding: 40, textAlign: "center", background: "#fff", borderRadius: 20, border: "1px dashed #cbd5e1" }}><p className="muted" style={{ margin: 0, fontSize: "1.1rem" }}>No articles found in this section.</p></div>}
+              );
+            }) : <div style={{ padding: 40, textAlign: "center", background: "#fff", borderRadius: 20, border: "1px dashed #cbd5e1" }}><p className="muted" style={{ margin: 0, fontSize: "1.1rem" }}>No articles found in this section.</p></div>}
           </div>
         </div>
       </section>
