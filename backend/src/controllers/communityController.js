@@ -22,7 +22,10 @@ const createPost = async (req, res) => {
 
 const getFeed = async (req, res) => {
   try {
-    const userId = req.query.userId || null;
+    let userId = req.query.userId;
+    if (!userId || userId === "undefined" || userId === "null") {
+      userId = null;
+    }
     const posts = await Community.getForumPosts(userId);
     res.status(200).json(posts);
   } catch (error) {

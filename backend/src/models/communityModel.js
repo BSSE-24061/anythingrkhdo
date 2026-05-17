@@ -1,5 +1,33 @@
 const db = require("../config/db");
 
+let isInitialized = false;
+const initForumTables = async () => {
+  if (isInitialized) return;
+  try {
+    await db.query(`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS forum_post_likes (
+        like_id SERIAL PRIMARY KEY,
+        post_id UUID NOT NULL REFERENCES forum_posts(post_id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (post_id, user_id)
+      );
+    `).catch(() => db.query(`
+      CREATE TABLE IF NOT EXISTS forum_post_likes (
+        like_id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES forum_posts(post_id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (post_id, user_id)
+      );
+    `));
+    isInitialized = true;
+  } catch (err) {
+    console.error("Auto-migration failed:", err.message);
+  }
+};
+
 const createForumPost = async (postData) => {
   const { user_id, category, title, body } = postData;
 
@@ -14,6 +42,7 @@ const createForumPost = async (postData) => {
 };
 
 const getForumPosts = async (userId = null) => {
+  await initForumTables();
   const query = `
         SELECT fp.*, u.full_name AS author_name, u.role AS author_role,
                COALESCE(like_counts.likes_count, 0) AS likes_count,
@@ -37,6 +66,7 @@ const getForumPosts = async (userId = null) => {
 };
 
 const getForumPostById = async (postId) => {
+  await initForumTables();
   const query = `
         SELECT fp.*, u.full_name AS author_name, u.role AS author_role
         FROM forum_posts fp
@@ -73,6 +103,7 @@ const getPostReplies = async (postId) => {
 };
 
 const checkUserLikedPost = async (postId, userId) => {
+  await initForumTables();
   const query = `
     SELECT COUNT(*) AS like_count
     FROM forum_post_likes
