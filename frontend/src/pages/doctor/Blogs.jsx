@@ -9,7 +9,7 @@ const Blogs = () => {
   const [pending, setPending] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [mode, setMode] = useState("feed");
-  const [form, setForm] = useState({ title: "", body: "", category: "", cover_image: "" });
+  const [form, setForm] = useState({ title: "", body: "", category: "" });
   const [commentText, setCommentText] = useState({});
   const [userLikedArticles, setUserLikedArticles] = useState(new Set());
   const [liking, setLiking] = useState({});
@@ -53,10 +53,9 @@ const Blogs = () => {
         title: form.title,
         body: form.body,
         category: form.category,
-        cover_image: form.cover_image,
         status: "hidden",
       });
-      setForm({ title: "", body: "", category: "", cover_image: "" });
+      setForm({ title: "", body: "", category: "" });
       load();
     } catch (error) {
       console.error(error);
@@ -137,7 +136,6 @@ const Blogs = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <input style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #cbd5e1", outline: "none" }} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" required />
               <input style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #cbd5e1", outline: "none" }} value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} placeholder="Category" />
-              <input style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #cbd5e1", outline: "none" }} value={form.cover_image} onChange={(event) => setForm((current) => ({ ...current, cover_image: event.target.value }))} placeholder="Cover image URL" />
               <textarea style={{ padding: "16px", borderRadius: 12, border: "1px solid #cbd5e1", outline: "none", resize: "vertical" }} rows="8" value={form.body} onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} placeholder="Write your article..." required />
               <button type="submit" className="btn-main" style={{ padding: "14px", borderRadius: 12, marginTop: 8 }}>Submit for Approval</button>
             </div>
