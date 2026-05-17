@@ -78,12 +78,10 @@ const DoctorRouteLayout = () => {
             src="/small%20logo.png"
             alt="MediCare logo"
             style={{
-              width: 34,
               height: 34,
-              borderRadius: 10,
+              width: "auto",
               objectFit: "contain",
-              background: "#fff",
-              boxShadow: "0 8px 20px rgba(37, 99, 235, 0.25)",
+              borderRadius: 6,
             }}
           />
           <div style={{ lineHeight: 1.1 }}>
