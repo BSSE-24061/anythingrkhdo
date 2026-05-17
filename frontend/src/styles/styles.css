@@ -469,6 +469,18 @@ img {
   transform: translateY(-1px);
 }
 
+.btn-main:disabled,
+.btn-ghost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-main:disabled:hover,
+.btn-ghost:disabled:hover {
+  transform: none;
+}
+
 .page-shell {
   width: min(1200px, calc(100% - 32px));
   margin: 18px auto 56px;
