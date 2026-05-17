@@ -18,6 +18,7 @@ const DOSE_LABELS = {
 const MedicationLogs = () => {
   const user = useMemo(() => getStoredUser(), []);
   const [logs, setLogs] = useState([]);
+  const [viewMode, setViewMode] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +51,24 @@ const MedicationLogs = () => {
     }
   };
 
+  const isToday = (value) => {
+    if (!value) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
+
+  const visibleLogs =
+    viewMode === "today"
+      ? logs.filter((log) => isToday(log.scheduled_time))
+      : logs;
+
   return (
     <div className="page-shell">
       <section className="hero-panel">
@@ -68,13 +87,29 @@ const MedicationLogs = () => {
         <section className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
             <h3 style={{ margin: 0 }}>Active Schedule</h3>
-            <button className="btn-ghost small" onClick={loadLogs}>Refresh</button>
+            <div className="inline-actions">
+              <button
+                type="button"
+                className={viewMode === "today" ? "btn-main small" : "btn-ghost small"}
+                onClick={() => setViewMode("today")}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className={viewMode === "all" ? "btn-main small" : "btn-ghost small"}
+                onClick={() => setViewMode("all")}
+              >
+                All Medications
+              </button>
+              <button className="btn-ghost small" onClick={loadLogs}>Refresh</button>
+            </div>
           </div>
 
           <div className="list-stack">
             {loading ? (
               <p className="muted" style={{ textAlign: "center", padding: 20 }}>Syncing schedule...</p>
-            ) : logs.length ? logs.map((l) => {
+            ) : visibleLogs.length ? visibleLogs.map((l) => {
               const statusStyle = PILL_STYLES[l.status] || PILL_STYLES.pending;
               return (
                 <div 
@@ -140,7 +175,11 @@ const MedicationLogs = () => {
             }) : (
               <div style={{ textAlign: "center", padding: 60 }}>
                 <div style={{ fontSize: 40, marginBottom: 16 }}>🌿</div>
-                <p className="muted" style={{ fontSize: "1.1rem" }}>No medications currently logged in your schedule.</p>
+                <p className="muted" style={{ fontSize: "1.1rem" }}>
+                  {viewMode === "today"
+                    ? "No medications scheduled for today."
+                    : "No medications currently logged in your schedule."}
+                </p>
               </div>
             )}
           </div>
