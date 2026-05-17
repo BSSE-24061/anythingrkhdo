@@ -6,6 +6,7 @@ import { getStoredUser } from "../../utils/session";
 const BlogArticle = () => {
   const { articleId } = useParams();
   const user = useMemo(() => getStoredUser(), []);
+  const userId = user?.id || user?.user_id;
   const [article, setArticle] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState("");
@@ -19,12 +20,12 @@ const BlogArticle = () => {
   const loadArticle = useCallback(async () => {
     if (!articleId) return;
 
-    const detail = await blogApi.getArticle(articleId, user?.id);
+    const detail = await blogApi.getArticle(articleId, userId);
     const payload = detail.data || {};
     setArticle(payload.article);
     setComments(Array.isArray(payload.comments) ? payload.comments : []);
     setUserLiked(payload.article?.user_has_liked || false);
-  }, [articleId, user?.id]);
+  }, [articleId, userId]);
 
   useEffect(() => {
     const init = async () => {
@@ -62,7 +63,7 @@ const BlogArticle = () => {
       // API call in background
       await blogApi.comment({
         article_id: articleId,
-        user_id: user.id,
+        user_id: userId,
         body: commentText,
       });
       
@@ -86,13 +87,10 @@ const BlogArticle = () => {
     setLiking(true);
 
     try {
-      await blogApi.like({ article_id: articleId, user_id: user.id });
+      await blogApi.like({ article_id: articleId, user_id: userId });
       setUserLiked(true);
       setNotice("Thanks for appreciating this story.");
-      setArticle((prev) => ({
-        ...prev,
-        likes_count: (prev?.likes_count || 0) + 1,
-      }));
+      await loadArticle();
     } catch (err) {
       const message = getErrorMessage(err);
       if (message.toLowerCase().includes("already")) {
@@ -113,7 +111,7 @@ const BlogArticle = () => {
 
     try {
       setError("");
-      await blogApi.bookmark({ article_id: articleId, user_id: user.id });
+      await blogApi.bookmark({ article_id: articleId, user_id: userId });
       setBookmarked(true);
       setNotice("Article bookmarked.");
     } catch (err) {

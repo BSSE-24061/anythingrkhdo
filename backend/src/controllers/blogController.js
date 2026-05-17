@@ -1,5 +1,10 @@
 const Blog = require("../models/blogModel");
 
+const parseUserId = (value) => {
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
+};
+
 const publishArticle = async (req, res) => {
   try {
     const { author_user_id, title, body } = req.body;
@@ -22,7 +27,7 @@ const publishArticle = async (req, res) => {
 
 const getBlogFeed = async (req, res) => {
   try {
-    const userId = req.query.userId || null;
+    const userId = parseUserId(req.query.userId);
     const articles = await Blog.getArticles(userId);
     res.status(200).json(articles);
   } catch (error) {
@@ -33,7 +38,7 @@ const getBlogFeed = async (req, res) => {
 
 const getPendingArticles = async (req, res) => {
   try {
-    const userId = req.query.userId || null;
+    const userId = parseUserId(req.query.userId);
     const articles = await Blog.getPendingArticles(userId);
     res.status(200).json(articles);
   } catch (error) {
@@ -123,7 +128,7 @@ const removeBookmark = async (req, res) => {
 const getArticle = async (req, res) => {
   try {
     const articleId = req.params.articleId;
-    const userId = req.query.userId; // Get user_id from query params
+    const userId = parseUserId(req.query.userId);
 
     const article = await Blog.getArticleById(articleId);
 

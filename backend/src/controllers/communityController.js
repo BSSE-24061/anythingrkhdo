@@ -1,5 +1,10 @@
 const Community = require("../models/communityModel");
 
+const parseUserId = (value) => {
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
+};
+
 const createPost = async (req, res) => {
   try {
     const { user_id, title, body } = req.body;
@@ -22,7 +27,7 @@ const createPost = async (req, res) => {
 
 const getFeed = async (req, res) => {
   try {
-    const userId = req.query.userId || null;
+    const userId = parseUserId(req.query.userId);
     const posts = await Community.getForumPosts(userId);
     res.status(200).json(posts);
   } catch (error) {
@@ -158,6 +163,7 @@ module.exports = {
   getFeed,
   getPost,
   replyToPost,
+  likePost,
   loadReplies,
   submitReport,
   getReports,

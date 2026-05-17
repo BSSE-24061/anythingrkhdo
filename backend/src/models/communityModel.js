@@ -1,5 +1,22 @@
 const db = require("../config/db");
 
+const ensureForumLikesSchema = async () => {
+  await db.query(`
+    ALTER TABLE forum_posts
+    ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0;
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS forum_post_likes (
+      like_id SERIAL PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES forum_posts(post_id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (post_id, user_id)
+    );
+  `);
+};
+
 const createForumPost = async (postData) => {
   const { user_id, category, title, body } = postData;
 
@@ -14,6 +31,8 @@ const createForumPost = async (postData) => {
 };
 
 const getForumPosts = async (userId = null) => {
+  await ensureForumLikesSchema();
+
   const query = `
         SELECT fp.*, u.full_name AS author_name, u.role AS author_role,
                COALESCE(like_counts.likes_count, 0) AS likes_count,
@@ -73,6 +92,8 @@ const getPostReplies = async (postId) => {
 };
 
 const checkUserLikedPost = async (postId, userId) => {
+  await ensureForumLikesSchema();
+
   const query = `
     SELECT COUNT(*) AS like_count
     FROM forum_post_likes
@@ -83,6 +104,8 @@ const checkUserLikedPost = async (postId, userId) => {
 };
 
 const likePost = async (postId, userId) => {
+  await ensureForumLikesSchema();
+
   const alreadyLiked = await checkUserLikedPost(postId, userId);
   if (alreadyLiked) {
     const error = new Error("User has already liked this post");

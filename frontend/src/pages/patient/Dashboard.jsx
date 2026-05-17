@@ -32,6 +32,7 @@ const STATUS_PILL_STYLES = {
 
 const PatientDashboard = () => {
   const user = useMemo(() => getStoredUser(), []);
+  const userId = user?.id || user?.user_id;
   const [unread, setUnread] = useState(0);
   const [appointments, setAppointments] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -54,9 +55,9 @@ const PatientDashboard = () => {
 
   useEffect(() => {
     const loadUnread = async () => {
-      if (!user?.id) return;
+      if (!userId) return;
       try {
-        const unreadResponse = await notificationApi.unreadCount(user.id);
+        const unreadResponse = await notificationApi.unreadCount(userId);
         setUnread(unreadResponse.data.unread_count || 0);
       } catch {
         setUnread(0);
@@ -64,16 +65,16 @@ const PatientDashboard = () => {
     };
 
     const loadPatientData = async () => {
-      if (!user?.id) return;
+      if (!userId) return;
       try {
-        const appointmentsResponse = await appointmentApi.byPatient(user.id);
+        const appointmentsResponse = await appointmentApi.byPatient(userId);
         setAppointments(appointmentsResponse.data || []);
 
-        const logsResponse = await medicationApi.byPatientLogs(user.id);
+        const logsResponse = await medicationApi.byPatientLogs(userId);
         const logsData = Array.isArray(logsResponse.data) ? logsResponse.data : [];
         setMedicationLogs(logsData);
 
-        const alertsResponse = await vitalApi.getAlerts(user.id);
+        const alertsResponse = await vitalApi.getAlerts(userId);
         const data = alertsResponse.data || [];
 
         // Detect Overdue Medications (Pending and time is in the past)
@@ -108,13 +109,13 @@ const PatientDashboard = () => {
 
         setAlerts([...virtualMedAlerts, ...data]);
 
-        const historyResponse = await historyApi.getByPatient(user.id);
+        const historyResponse = await historyApi.getByPatient(userId);
         setRecentHistory(historyResponse.data || []);
 
-        const blogsResponse = await blogApi.feed(user.id);
+        const blogsResponse = await blogApi.feed(userId);
         setBlogs(blogsResponse.data || []);
 
-        const forumResponse = await forumApi.feed(user.id);
+        const forumResponse = await forumApi.feed(userId);
         setForumPosts(forumResponse.data || []);
       } catch (err) {
         console.error("Error loading patient data:", err);

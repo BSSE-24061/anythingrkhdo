@@ -5,6 +5,7 @@ import { getStoredUser } from "../../utils/session";
 
 const Blogs = () => {
   const user = getStoredUser();
+  const userId = user?.id || user?.user_id;
   const [feed, setFeed] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [mode, setMode] = useState("feed");
@@ -15,12 +16,12 @@ const Blogs = () => {
   const [error, setError] = useState("");
 
   const loadData = async () => {
-    if (!user?.id) return;
+    if (!userId) return;
     try {
       setLoading(true);
       const [feedResponse, bookmarksResponse] = await Promise.all([
-        blogApi.feed(user.id),
-        blogApi.bookmarks(user.id)
+        blogApi.feed(userId),
+        blogApi.bookmarks(userId)
       ]);
       
       const activeFeed = feedResponse.data || [];
@@ -48,24 +49,8 @@ const Blogs = () => {
     loadData();
   }, []);
 
-  const incrementArticleLikeCount = (articleId) => {
-    setFeed((prev) =>
-      prev.map((article) =>
-        article.article_id === articleId
-          ? { ...article, likes_count: (article.likes_count || 0) + 1 }
-          : article,
-      ),
-    );
-    setBookmarks((prev) =>
-      prev.map((article) =>
-        article.article_id === articleId
-          ? { ...article, likes_count: (article.likes_count || 0) + 1 }
-          : article,
-      ),
-    );
-  };
-
   const likeArticle = async (articleId) => {
+    if (!userId) return;
     if (userLikedArticles.has(articleId)) {
       setNotice("You already liked this article.");
       return;
@@ -74,9 +59,9 @@ const Blogs = () => {
 
     setLiking((prev) => ({ ...prev, [articleId]: true }));
     try {
-      await blogApi.like({ article_id: articleId, user_id: user.id });
+      await blogApi.like({ article_id: articleId, user_id: userId });
       setUserLikedArticles((prev) => new Set(prev).add(articleId));
-      incrementArticleLikeCount(articleId);
+      await loadData();
       setNotice("Thanks for liking this article.");
     } catch (err) {
       console.error(err);
@@ -94,7 +79,7 @@ const Blogs = () => {
 
   const bookmarkArticle = async (articleId) => {
     try {
-      await blogApi.bookmark({ article_id: articleId, user_id: user.id });
+      await blogApi.bookmark({ article_id: articleId, user_id: userId });
       alert("Added to your bookmarks!");
       loadData();
     } catch (err) {
