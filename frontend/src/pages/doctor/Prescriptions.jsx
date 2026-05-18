@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { appointmentApi, medicationApi, prescriptionApi } from "../../utils/apiHelper";
+import {
+  appointmentApi,
+  medicationApi,
+  prescriptionApi,
+} from "../../utils/apiHelper";
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
+import { formatIslamabadDateTime } from "../../utils/dateTime";
 
 const DOSE_PERIODS = [
   { key: "morning", label: "Morning" },
@@ -26,13 +31,28 @@ const Prescriptions = () => {
   const [medications, setMedications] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [prescriptionMedications, setPrescriptionMedications] = useState([]);
-  const [selectedPatient, setSelectedPatient] = useState(searchParams.get("patient") || "");
+  const [appointments, setAppointments] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(
+    searchParams.get("patient") || "",
+  );
+  const [selectedAppointment, setSelectedAppointment] = useState(
+    searchParams.get("appointment") || "",
+  );
   const [selectedPrescription, setSelectedPrescription] = useState("");
   const [loading, setLoading] = useState(true);
-  const [masterForm, setMasterForm] = useState({ diagnosis: "", diagnosis_notes: "", symptoms_notes: "", follow_up_date: "" });
+  const [masterForm, setMasterForm] = useState({
+    diagnosis: "",
+    diagnosis_notes: "",
+    symptoms_notes: "",
+    follow_up_date: "",
+  });
   const [medForm, setMedForm] = useState(emptyMedicationForm);
   const [showRequestMedication, setShowRequestMedication] = useState(false);
-  const [requestMedForm, setRequestMedForm] = useState({ name: "", type: "", description: "" });
+  const [requestMedForm, setRequestMedForm] = useState({
+    name: "",
+    type: "",
+    description: "",
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -41,8 +61,9 @@ const Prescriptions = () => {
       try {
         const [appointmentsResponse, medicationsResponse] = await Promise.all([
           appointmentApi.byDoctor(user.id),
-          medicationApi.list('approved'),
+          medicationApi.list("approved"),
         ]);
+        setAppointments(appointmentsResponse.data || []);
         setPatients(patientsFromAppointments(appointmentsResponse.data || []));
         setMedications(medicationsResponse.data || []);
       } catch (error) {
@@ -61,6 +82,7 @@ const Prescriptions = () => {
         setPrescriptions([]);
         setPrescriptionMedications([]);
         setSelectedPrescription("");
+        setSelectedAppointment("");
         return;
       }
 
@@ -83,7 +105,8 @@ const Prescriptions = () => {
       }
 
       try {
-        const response = await prescriptionApi.byPrescription(selectedPrescription);
+        const response =
+          await prescriptionApi.byPrescription(selectedPrescription);
         setPrescriptionMedications(response.data || []);
       } catch (error) {
         console.error(error);
@@ -97,6 +120,62 @@ const Prescriptions = () => {
     () => patients.find((patient) => patient.user_id === selectedPatient),
     [patients, selectedPatient],
   );
+
+  // Get all (pending, confirmed) appointments for the selected patient - exclude completed
+  const availableAppointments = useMemo(() => {
+    return appointments.filter(
+      (apt) =>
+        apt.patient_user_id === selectedPatient && apt.status !== "completed",
+    );
+  }, [appointments, selectedPatient]);
+
+  // Get the selected appointment details
+  const selectedAppointmentData = useMemo(() => {
+    return appointments.find(
+      (apt) => apt.appointment_id === selectedAppointment,
+    );
+  }, [appointments, selectedAppointment]);
+
+  // Check if current time is at or after appointment start time
+  const isAppointmentTimeReached = useMemo(() => {
+    if (!selectedAppointmentData) return false;
+    const appointmentStart = new Date(selectedAppointmentData.scheduled_at);
+    return new Date() >= appointmentStart;
+  }, [selectedAppointmentData]);
+
+  // Check if prescription can be created
+  const canCreatePrescription = useMemo(() => {
+    return (
+      selectedPatient &&
+      selectedAppointment &&
+      selectedAppointmentData?.status !== "completed" &&
+      isAppointmentTimeReached
+    );
+  }, [
+    selectedPatient,
+    selectedAppointment,
+    selectedAppointmentData,
+    isAppointmentTimeReached,
+  ]);
+
+  // Get message about why prescription cannot be created
+  const prescriptionDisabledMessage = useMemo(() => {
+    if (!selectedPatient) return "Select a patient first";
+    if (!selectedAppointment) return "Select an appointment";
+    if (selectedAppointmentData?.status === "completed") {
+      return "Cannot prescribe - appointment has been marked as done";
+    }
+    if (!isAppointmentTimeReached) {
+      const appointmentTime = new Date(selectedAppointmentData?.scheduled_at);
+      return `Prescription available from ${formatIslamabadDateTime(appointmentTime)}`;
+    }
+    return "";
+  }, [
+    selectedPatient,
+    selectedAppointment,
+    selectedAppointmentData,
+    isAppointmentTimeReached,
+  ]);
 
   const formatPrescriptionDate = (value) => {
     if (!value) return "N/A";
@@ -113,7 +192,10 @@ const Prescriptions = () => {
   const formatDoseSchedule = (item) => {
     if (item.dosage_schedule && typeof item.dosage_schedule === "object") {
       return Object.entries(item.dosage_schedule)
-        .map(([period, dose]) => `${period.charAt(0).toUpperCase() + period.slice(1)}: ${dose}`)
+        .map(
+          ([period, dose]) =>
+            `${period.charAt(0).toUpperCase() + period.slice(1)}: ${dose}`,
+        )
         .join(" • ");
     }
 
@@ -122,6 +204,11 @@ const Prescriptions = () => {
 
   const createPrescription = async (event) => {
     event.preventDefault();
+
+    if (!canCreatePrescription) {
+      alert(prescriptionDisabledMessage || "Cannot create prescription");
+      return;
+    }
 
     if (masterForm.follow_up_date) {
       const today = new Date();
@@ -138,6 +225,7 @@ const Prescriptions = () => {
       const response = await prescriptionApi.createMaster({
         patient_user_id: selectedPatient,
         doctor_user_id: user.id,
+        appointment_id: selectedAppointment,
         diagnosis: masterForm.diagnosis,
         diagnosis_notes: masterForm.diagnosis_notes,
         symptoms_notes: masterForm.symptoms_notes,
@@ -145,15 +233,22 @@ const Prescriptions = () => {
       });
 
       const newPrescription = response.data?.prescription;
-      setMasterForm({ diagnosis: "", diagnosis_notes: "", symptoms_notes: "", follow_up_date: "" });
+      setMasterForm({
+        diagnosis: "",
+        diagnosis_notes: "",
+        symptoms_notes: "",
+        follow_up_date: "",
+      });
       if (newPrescription?.prescription_id) {
         setSelectedPrescription(newPrescription.prescription_id);
       }
 
-      const prescriptionsResponse = await prescriptionApi.byPatient(selectedPatient);
+      const prescriptionsResponse =
+        await prescriptionApi.byPatient(selectedPatient);
       setPrescriptions(prescriptionsResponse.data || []);
     } catch (error) {
       console.error(error);
+      alert(error?.response?.data?.error || "Failed to create prescription");
     }
   };
 
@@ -182,7 +277,9 @@ const Prescriptions = () => {
     }
 
     const dosageSchedule = Object.fromEntries(
-      Object.entries(medForm.dosage_schedule).filter(([, value]) => value.trim()),
+      Object.entries(medForm.dosage_schedule).filter(([, value]) =>
+        value.trim(),
+      ),
     );
 
     if (Object.keys(dosageSchedule).length === 0) {
@@ -202,14 +299,18 @@ const Prescriptions = () => {
         end_date: medForm.end_date || null,
       });
 
-      const patientMedicationId = response.data?.medication?.patient_medication_id;
+      const patientMedicationId =
+        response.data?.medication?.patient_medication_id;
       if (!patientMedicationId) {
-        throw new Error("Unable to determine patient medication ID after adding medication.");
+        throw new Error(
+          "Unable to determine patient medication ID after adding medication.",
+        );
       }
 
       medicationCreated = true;
 
-      const medResponse = await prescriptionApi.byPrescription(selectedPrescription);
+      const medResponse =
+        await prescriptionApi.byPrescription(selectedPrescription);
       setPrescriptionMedications(medResponse.data || []);
     } catch (error) {
       console.error(error);
@@ -227,7 +328,7 @@ const Prescriptions = () => {
         name: requestMedForm.name,
         type: requestMedForm.type,
         description: requestMedForm.description,
-        status: "pending"
+        status: "pending",
       });
       alert("Medication requested successfully! An admin will review it.");
       setRequestMedForm({ name: "", type: "", description: "" });
@@ -243,7 +344,9 @@ const Prescriptions = () => {
       <section className="page-heading">
         <div>
           <h1>Prescriptions</h1>
-          <p className="muted">Create a prescription, add medications, and attach treatment logs.</p>
+          <p className="muted">
+            Create a prescription, add medications, and attach treatment logs.
+          </p>
         </div>
       </section>
 
@@ -253,22 +356,138 @@ const Prescriptions = () => {
             <h3>Patient</h3>
           </div>
 
-          <select value={selectedPatient} onChange={(event) => setSelectedPatient(event.target.value)}>
+          <select
+            value={selectedPatient}
+            onChange={(event) => setSelectedPatient(event.target.value)}
+          >
             <option value="">Choose a patient</option>
             {patients.map((patient) => (
-              <option key={patient.user_id} value={patient.user_id}>{patient.full_name}</option>
+              <option key={patient.user_id} value={patient.user_id}>
+                {patient.full_name}
+              </option>
             ))}
           </select>
 
+          {selectedPatient && (
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 8,
+                  fontWeight: 800,
+                  fontSize: 13,
+                  color: "#475569",
+                }}
+              >
+                Appointment (ongoing appointments only)
+              </label>
+              <select
+                value={selectedAppointment}
+                onChange={(event) => setSelectedAppointment(event.target.value)}
+                style={{ width: "100%" }}
+              >
+                <option value="">Select an ongoing appointment</option>
+                {availableAppointments.length === 0 ? (
+                  <option disabled>No ongoing appointments</option>
+                ) : (
+                  availableAppointments.map((apt) => (
+                    <option key={apt.appointment_id} value={apt.appointment_id}>
+                      {formatIslamabadDateTime(apt.scheduled_at)} -{" "}
+                      {apt.reason || "Consultation"}
+                    </option>
+                  ))
+                )}
+              </select>
+              {availableAppointments.length === 0 && (
+                <p style={{ fontSize: 12, color: "#ef4444", marginTop: 6 }}>
+                  No ongoing appointments. Complete an appointment first to
+                  prescribe.
+                </p>
+              )}
+            </div>
+          )}
+
+          {selectedAppointment && !canCreatePrescription && (
+            <div
+              style={{
+                padding: 12,
+                background: "#fef3c7",
+                border: "1px solid #fcd34d",
+                borderRadius: 8,
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#92400e",
+                fontWeight: 600,
+              }}
+            >
+              ⚠️ {prescriptionDisabledMessage}
+            </div>
+          )}
+
           <form className="form-grid" onSubmit={createPrescription}>
-            <input value={masterForm.diagnosis} onChange={(event) => setMasterForm((current) => ({ ...current, diagnosis: event.target.value }))} placeholder="Diagnosis" required />
-            <textarea rows="3" value={masterForm.diagnosis_notes} onChange={(event) => setMasterForm((current) => ({ ...current, diagnosis_notes: event.target.value }))} placeholder="Diagnosis notes" />
-            <textarea rows="3" value={masterForm.symptoms_notes} onChange={(event) => setMasterForm((current) => ({ ...current, symptoms_notes: event.target.value }))} placeholder="Symptoms notes" />
+            <input
+              value={masterForm.diagnosis}
+              onChange={(event) =>
+                setMasterForm((current) => ({
+                  ...current,
+                  diagnosis: event.target.value,
+                }))
+              }
+              placeholder="Diagnosis"
+              required
+            />
+            <textarea
+              rows="3"
+              value={masterForm.diagnosis_notes}
+              onChange={(event) =>
+                setMasterForm((current) => ({
+                  ...current,
+                  diagnosis_notes: event.target.value,
+                }))
+              }
+              placeholder="Diagnosis notes"
+            />
+            <textarea
+              rows="3"
+              value={masterForm.symptoms_notes}
+              onChange={(event) =>
+                setMasterForm((current) => ({
+                  ...current,
+                  symptoms_notes: event.target.value,
+                }))
+              }
+              placeholder="Symptoms notes"
+            />
             <label>
               Follow-up Date
-              <input type="date" min={new Date().toISOString().split("T")[0]} value={masterForm.follow_up_date} onChange={(event) => setMasterForm((current) => ({ ...current, follow_up_date: event.target.value }))} />
+              <input
+                type="date"
+                min={new Date().toISOString().split("T")[0]}
+                value={masterForm.follow_up_date}
+                onChange={(event) =>
+                  setMasterForm((current) => ({
+                    ...current,
+                    follow_up_date: event.target.value,
+                  }))
+                }
+              />
             </label>
-            <button type="submit" className="btn-main">Create Prescription</button>
+            <button
+              type="submit"
+              className="btn-main"
+              disabled={!canCreatePrescription}
+              title={
+                !canCreatePrescription
+                  ? prescriptionDisabledMessage
+                  : "Create prescription"
+              }
+              style={{
+                opacity: !canCreatePrescription ? 0.5 : 1,
+                cursor: !canCreatePrescription ? "not-allowed" : "pointer",
+              }}
+            >
+              Create Prescription
+            </button>
           </form>
         </div>
 
@@ -277,17 +496,35 @@ const Prescriptions = () => {
             <h3>Prescription Medications</h3>
           </div>
 
-          <select value={selectedPrescription} onChange={(event) => setSelectedPrescription(event.target.value)}>
+          <select
+            value={selectedPrescription}
+            onChange={(event) => setSelectedPrescription(event.target.value)}
+          >
             <option value="">Choose a prescription</option>
             {prescriptions.map((prescription) => (
-              <option key={prescription.prescription_id} value={prescription.prescription_id}>
-                {prescription.diagnosis} - {new Date(prescription.prescribed_at).toLocaleDateString()}
+              <option
+                key={prescription.prescription_id}
+                value={prescription.prescription_id}
+              >
+                {prescription.diagnosis} -{" "}
+                {new Date(prescription.prescribed_at).toLocaleDateString()}
               </option>
             ))}
           </select>
 
-          <form className="form-grid" onSubmit={addMedication} style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", position: "relative" }}>
+          <form
+            className="form-grid"
+            onSubmit={addMedication}
+            style={{ marginTop: 14 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                position: "relative",
+              }}
+            >
               <div style={{ flex: 1 }}>
                 <input
                   list="medications-list"
@@ -295,34 +532,92 @@ const Prescriptions = () => {
                   value={medForm.medicationName || ""}
                   onChange={(e) => {
                     const name = e.target.value;
-                    const med = medications.find(m => m.name === name);
-                    setMedForm(current => ({ 
-                      ...current, 
-                      medicationName: name, 
-                      medication_id: med ? med.medication_id : "" 
+                    const med = medications.find((m) => m.name === name);
+                    setMedForm((current) => ({
+                      ...current,
+                      medicationName: name,
+                      medication_id: med ? med.medication_id : "",
                     }));
                   }}
                   required
                 />
                 <datalist id="medications-list">
                   {medications.map((medication) => (
-                    <option key={medication.medication_id} value={medication.name} />
+                    <option
+                      key={medication.medication_id}
+                      value={medication.name}
+                    />
                   ))}
                 </datalist>
               </div>
-              <button type="button" className="btn-soft" style={{ padding: "12px", whiteSpace: "nowrap" }} onClick={() => setShowRequestMedication(!showRequestMedication)}>
-                {showRequestMedication ? "Cancel Request" : "Not Found? Request"}
+              <button
+                type="button"
+                className="btn-soft"
+                style={{ padding: "12px", whiteSpace: "nowrap" }}
+                onClick={() => setShowRequestMedication(!showRequestMedication)}
+              >
+                {showRequestMedication
+                  ? "Cancel Request"
+                  : "Not Found? Request"}
               </button>
             </div>
-            
+
             {showRequestMedication && (
-              <div style={{ background: "rgba(2, 132, 199, 0.05)", padding: 16, borderRadius: 12, border: "1px dashed rgba(2, 132, 199, 0.3)", marginBottom: 16 }}>
-                <h4 style={{ margin: "0 0 12px 0", color: "var(--text)" }}>Request New Medication</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <input value={requestMedForm.name} onChange={(e) => setRequestMedForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Medication Name" required />
-                  <input value={requestMedForm.type} onChange={(e) => setRequestMedForm(prev => ({ ...prev, type: e.target.value }))} placeholder="Type (e.g. Tablet, Syrup)" />
-                  <textarea rows="2" value={requestMedForm.description} onChange={(e) => setRequestMedForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Description/Reason for request" />
-                  <button type="button" onClick={requestNewMedication} className="btn-main small" style={{ width: "fit-content" }}>Submit Request</button>
+              <div
+                style={{
+                  background: "rgba(2, 132, 199, 0.05)",
+                  padding: 16,
+                  borderRadius: 12,
+                  border: "1px dashed rgba(2, 132, 199, 0.3)",
+                  marginBottom: 16,
+                }}
+              >
+                <h4 style={{ margin: "0 0 12px 0", color: "var(--text)" }}>
+                  Request New Medication
+                </h4>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <input
+                    value={requestMedForm.name}
+                    onChange={(e) =>
+                      setRequestMedForm((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    placeholder="Medication Name"
+                    required
+                  />
+                  <input
+                    value={requestMedForm.type}
+                    onChange={(e) =>
+                      setRequestMedForm((prev) => ({
+                        ...prev,
+                        type: e.target.value,
+                      }))
+                    }
+                    placeholder="Type (e.g. Tablet, Syrup)"
+                  />
+                  <textarea
+                    rows="2"
+                    value={requestMedForm.description}
+                    onChange={(e) =>
+                      setRequestMedForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Description/Reason for request"
+                  />
+                  <button
+                    type="button"
+                    onClick={requestNewMedication}
+                    className="btn-main small"
+                    style={{ width: "fit-content" }}
+                  >
+                    Submit Request
+                  </button>
                 </div>
               </div>
             )}
@@ -351,17 +646,41 @@ const Prescriptions = () => {
               </div>
             </div>
             <div className="form-columns">
-              <input type="date" value={medForm.start_date} onChange={(event) => setMedForm((current) => ({ ...current, start_date: event.target.value }))} />
-              <input type="date" min={medForm.start_date || ""} value={medForm.end_date} onChange={(event) => setMedForm((current) => ({ ...current, end_date: event.target.value }))} />
+              <input
+                type="date"
+                value={medForm.start_date}
+                onChange={(event) =>
+                  setMedForm((current) => ({
+                    ...current,
+                    start_date: event.target.value,
+                  }))
+                }
+              />
+              <input
+                type="date"
+                min={medForm.start_date || ""}
+                value={medForm.end_date}
+                onChange={(event) =>
+                  setMedForm((current) => ({
+                    ...current,
+                    end_date: event.target.value,
+                  }))
+                }
+              />
             </div>
-            <button type="submit" className="btn-soft">Add Medication + Log</button>
+            <button type="submit" className="btn-soft">
+              Add Medication + Log
+            </button>
           </form>
         </div>
       </section>
 
       <section className="card" style={{ marginTop: 20 }}>
         <div className="section-heading">
-          <h3>Prescription History {selectedPatientInfo ? `for ${selectedPatientInfo.full_name}` : ""}</h3>
+          <h3>
+            Prescription History{" "}
+            {selectedPatientInfo ? `for ${selectedPatientInfo.full_name}` : ""}
+          </h3>
         </div>
 
         {loading ? (
@@ -371,9 +690,14 @@ const Prescriptions = () => {
             {prescriptions.map((prescription) => (
               <div className="list-item" key={prescription.prescription_id}>
                 <strong>{prescription.diagnosis}</strong>
-                <span>{new Date(prescription.prescribed_at).toLocaleString()}</span>
+                <span>
+                  {new Date(prescription.prescribed_at).toLocaleString()}
+                </span>
                 <p>{prescription.diagnosis_notes || "No notes"}</p>
-                <p className="muted">Follow-up: {formatPrescriptionDate(prescription.follow_up_date)}</p>
+                <p className="muted">
+                  Follow-up:{" "}
+                  {formatPrescriptionDate(prescription.follow_up_date)}
+                </p>
               </div>
             ))}
           </div>
@@ -391,7 +715,10 @@ const Prescriptions = () => {
                 <div className="list-item" key={item.patient_medication_id}>
                   <strong>{item.medication_name}</strong>
                   <span>{formatDoseSchedule(item)}</span>
-                  <p className="muted">{item.start_date || ""} {item.end_date ? `→ ${item.end_date}` : ""}</p>
+                  <p className="muted">
+                    {item.start_date || ""}{" "}
+                    {item.end_date ? `→ ${item.end_date}` : ""}
+                  </p>
                 </div>
               ))}
             </div>

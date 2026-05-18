@@ -1,6 +1,7 @@
 const Prescription = require("../models/prescriptionModel");
-const History = require("../models/historyModel"); // <-- NEW: We bring in the History model!
+const History = require("../models/historyModel");
 const Medication = require("../models/medicationModel");
+const Appointment = require("../models/appointmentModel");
 const { DOSE_SLOTS, isValidDosePeriod } = require("../constants/doseSlots");
 
 const parseDateOnly = (value) => {
@@ -53,18 +54,62 @@ const normalizeDosageSchedule = (dosageSchedule) => {
 // 1. Create the Master Prescription (The Diagnosis)
 const createMasterPrescription = async (req, res) => {
   try {
-    const { patient_user_id, doctor_user_id, diagnosis } = req.body;
+    const { patient_user_id, doctor_user_id, appointment_id, diagnosis } =
+      req.body;
 
-    if (!patient_user_id || !doctor_user_id || !diagnosis) {
+    if (!patient_user_id || !doctor_user_id || !diagnosis || !appointment_id) {
       return res
         .status(400)
-        .json({ error: "Patient ID, Doctor ID, and Diagnosis are required" });
+        .json({
+          error:
+            "Patient ID, Doctor ID, Appointment ID, and Diagnosis are required",
+        });
+    }
+
+    // Validate appointment exists
+    const appointment = await Appointment.getAppointmentById(appointment_id);
+    if (!appointment) {
+      return res.status(404).json({ error: "Appointment not found" });
+    }
+
+    // Verify appointment belongs to this patient and doctor
+    if (
+      appointment.patient_user_id !== patient_user_id ||
+      appointment.doctor_user_id !== doctor_user_id
+    ) {
+      return res
+        .status(403)
+        .json({
+          error: "Appointment does not match the selected patient and doctor",
+        });
+    }
+
+    // Check if appointment is already completed - cannot prescribe after marking done
+    if (appointment.status === "completed") {
+      return res.status(400).json({
+        error:
+          "Cannot create prescription. Appointment has already been marked as done. Prescriptions can only be issued during the appointment.",
+      });
+    }
+
+    // Check if current time is before appointment start time
+    const appointmentStartTime = new Date(appointment.scheduled_at);
+    const now = new Date();
+    if (now < appointmentStartTime) {
+      const formattedTime = appointmentStartTime.toLocaleString("en-PK", {
+        timeZone: "Asia/Karachi",
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+      return res.status(400).json({
+        error: `Prescription can only be issued starting from the appointment time (${formattedTime})`,
+      });
     }
 
     // 1. Create the prescription in the database
     const newPrescription = await Prescription.createPrescription(req.body);
 
-    // 2. NEW: AUTOMATICALLY log it to the history timeline!
+    // 2. AUTOMATICALLY log it to the history timeline!
     await History.addHistoryEvent({
       patient_user_id: patient_user_id,
       event_type: "Prescription Added",
@@ -100,7 +145,9 @@ const addMedication = async (req, res) => {
     const schedule = normalizeDosageSchedule(dosage_schedule);
     const primaryDosage =
       dosage ||
-      schedule.map((item) => `${DOSE_SLOTS[item.period].label}: ${item.dosage}`).join(", ");
+      schedule
+        .map((item) => `${DOSE_SLOTS[item.period].label}: ${item.dosage}`)
+        .join(", ");
     const derivedFrequency =
       frequency ||
       schedule.map((item) => DOSE_SLOTS[item.period].label).join(", ");
@@ -121,10 +168,13 @@ const addMedication = async (req, res) => {
       ...req.body,
       dosage: primaryDosage,
       frequency: derivedFrequency,
-      dosage_schedule: schedule.reduce((current, item) => ({
-        ...current,
-        [item.period]: item.dosage,
-      }), {}),
+      dosage_schedule: schedule.reduce(
+        (current, item) => ({
+          ...current,
+          [item.period]: item.dosage,
+        }),
+        {},
+      ),
     });
 
     try {
