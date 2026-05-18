@@ -1,4 +1,5 @@
 const Blog = require("../models/blogModel");
+const User = require("../models/userModel");
 
 const publishArticle = async (req, res) => {
   try {
@@ -8,6 +9,16 @@ const publishArticle = async (req, res) => {
       return res
         .status(400)
         .json({ error: "Author ID, Title, and Body are required" });
+    }
+
+    // Restrict patient role from creating blogs
+    const authorUser = await User.getUserById(author_user_id);
+    if (!authorUser) {
+      return res.status(404).json({ error: "Author user not found" });
+    }
+
+    if (authorUser.role === "patient") {
+      return res.status(403).json({ error: "Patients are not allowed to add or publish blog articles." });
     }
 
     const newArticle = await Blog.createArticle(req.body);

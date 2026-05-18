@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { blogApi } from "../../utils/apiHelper";
+import { blogApi, getErrorMessage } from "../../utils/apiHelper";
 import AppShell from "../../layouts/AppShell";
 import { getStoredUser } from "../../utils/session";
 
@@ -21,7 +21,7 @@ const AdminBlogApproval = () => {
       const response = await blogApi.pending();
       setPendingArticles(response.data || []);
     } catch (err) {
-      setError("Failed to load pending articles.");
+      setError(getErrorMessage(err, "Failed to load pending articles."));
       console.error(err);
     } finally {
       setLoading(false);
@@ -37,7 +37,7 @@ const AdminBlogApproval = () => {
       setSuccessMessage("Article approved successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError("Failed to approve article.");
+      setError(getErrorMessage(err, "Failed to approve article."));
       console.error(err);
     }
   };
@@ -51,7 +51,7 @@ const AdminBlogApproval = () => {
       setSuccessMessage("Article rejected successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError("Failed to reject article.");
+      setError(getErrorMessage(err, "Failed to reject article."));
       console.error(err);
     }
   };

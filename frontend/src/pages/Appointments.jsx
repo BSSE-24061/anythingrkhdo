@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { appointmentApi, availabilityApi, userApi, chatApi, getErrorMessage } from "../utils/apiHelper";
+import {
+  appointmentApi,
+  availabilityApi,
+  userApi,
+  chatApi,
+  getErrorMessage,
+} from "../utils/apiHelper";
 import { getStoredUser } from "../utils/session";
 import {
   formatIslamabadDateTime,
@@ -9,6 +15,7 @@ import {
   getIslamabadDateValue,
   getIslamabadTimeValue,
   getIslamabadWeekday,
+  isFutureSlotStrict,
 } from "../utils/dateTime";
 
 const statusLabel = (status) => (status === "cancelled" ? "rejected" : status);
@@ -68,11 +75,11 @@ const Appointments = () => {
     return `${hours}:${mins}`;
   };
 
-  const rangesOverlap = (startA, endA, startB, endB) => startA < endB && endA > startB;
+  const rangesOverlap = (startA, endA, startB, endB) =>
+    startA < endB && endA > startB;
 
   const isFutureSlot = (dateValue, timeValue) => {
-    const iso = createIslamabadDateTimeIso(dateValue, timeValue);
-    return iso && new Date(iso).getTime() > Date.now();
+    return isFutureSlotStrict(dateValue, timeValue);
   };
 
   const loadAppointments = useCallback(async () => {
@@ -120,7 +127,11 @@ const Appointments = () => {
 
   useEffect(() => {
     const loadSlots = async () => {
-      if (user?.role !== "patient" || !form.doctor_user_id || !form.appointment_date) {
+      if (
+        user?.role !== "patient" ||
+        !form.doctor_user_id ||
+        !form.appointment_date
+      ) {
         setAvailableSlots([]);
         return;
       }
@@ -137,9 +148,15 @@ const Appointments = () => {
         const selectedDay = getIslamabadWeekday(form.appointment_date);
         const bookedRanges = (appointmentsResponse.data || [])
           .filter((appointment) => appointment.status !== "cancelled")
-          .filter((appointment) => toLocalDateValue(appointment.scheduled_at) === form.appointment_date)
+          .filter(
+            (appointment) =>
+              toLocalDateValue(appointment.scheduled_at) ===
+              form.appointment_date,
+          )
           .map((appointment) => {
-            const start = timeToMinutes(getIslamabadTimeValue(appointment.scheduled_at));
+            const start = timeToMinutes(
+              getIslamabadTimeValue(appointment.scheduled_at),
+            );
             const duration = Number(appointment.duration_minutes) || 30;
             return { start, end: start + duration };
           });
@@ -151,13 +168,20 @@ const Appointments = () => {
             const windowEnd = timeToMinutes(slot.end_time);
             const generatedSlots = [];
 
-            for (let start = windowStart; start + 30 <= windowEnd; start += 30) {
+            for (
+              let start = windowStart;
+              start + 30 <= windowEnd;
+              start += 30
+            ) {
               const end = start + 30;
               const isBooked = bookedRanges.some((booking) =>
                 rangesOverlap(start, end, booking.start, booking.end),
               );
 
-              if (!isBooked && isFutureSlot(form.appointment_date, minutesToTime(start))) {
+              if (
+                !isBooked &&
+                isFutureSlot(form.appointment_date, minutesToTime(start))
+              ) {
                 generatedSlots.push({
                   availability_id: `${slot.availability_id}-${start}`,
                   start_time: minutesToTime(start),
@@ -199,44 +223,56 @@ const Appointments = () => {
         const availability = availabilityResponse.data || [];
         const appointments = appointmentsResponse.data || [];
 
-        const groupedSlots = getNextSevenDays().map(({ date, day }) => {
-          const bookedRanges = appointments
-            .filter((appointment) => appointment.status !== "cancelled")
-            .filter((appointment) => toLocalDateValue(appointment.scheduled_at) === date)
-            .map((appointment) => {
-              const start = timeToMinutes(getIslamabadTimeValue(appointment.scheduled_at));
-              const duration = Number(appointment.duration_minutes) || 30;
-              return { start, end: start + duration };
-            });
-
-          const slots = availability
-            .filter((slot) => slot.day_of_week === day)
-            .flatMap((slot) => {
-              const windowStart = timeToMinutes(slot.start_time);
-              const windowEnd = timeToMinutes(slot.end_time);
-              const generatedSlots = [];
-
-              for (let start = windowStart; start + 30 <= windowEnd; start += 30) {
-                const end = start + 30;
-                const startTime = minutesToTime(start);
-                const isBooked = bookedRanges.some((booking) =>
-                  rangesOverlap(start, end, booking.start, booking.end),
+        const groupedSlots = getNextSevenDays()
+          .map(({ date, day }) => {
+            const bookedRanges = appointments
+              .filter((appointment) => appointment.status !== "cancelled")
+              .filter(
+                (appointment) =>
+                  toLocalDateValue(appointment.scheduled_at) === date,
+              )
+              .map((appointment) => {
+                const start = timeToMinutes(
+                  getIslamabadTimeValue(appointment.scheduled_at),
                 );
+                const duration = Number(appointment.duration_minutes) || 30;
+                return { start, end: start + duration };
+              });
 
-                if (!isBooked && isFutureSlot(date, startTime)) {
-                  generatedSlots.push({
-                    id: `${date}-${start}`,
-                    start_time: startTime,
-                    end_time: minutesToTime(end),
-                  });
+            const slots = availability
+              .filter((slot) => slot.day_of_week === day)
+              .flatMap((slot) => {
+                const windowStart = timeToMinutes(slot.start_time);
+                const windowEnd = timeToMinutes(slot.end_time);
+                const generatedSlots = [];
+
+                for (
+                  let start = windowStart;
+                  start + 30 <= windowEnd;
+                  start += 30
+                ) {
+                  const end = start + 30;
+                  const startTime = minutesToTime(start);
+                  const isBooked = bookedRanges.some((booking) =>
+                    rangesOverlap(start, end, booking.start, booking.end),
+                  );
+
+                  if (!isBooked && isFutureSlot(date, startTime)) {
+                    generatedSlots.push({
+                      id: `${date}-${start}`,
+                      start_time: startTime,
+                      end_time: minutesToTime(end),
+                    });
+                  }
                 }
-              }
 
-              return generatedSlots;
-            });
+                return generatedSlots;
+              });
 
-          return { date, day, slots };
-        });
+            return { date, day, slots };
+          })
+          // Filter to only show dates with available slots
+          .filter((group) => group.slots.length > 0);
 
         setWeekSlots(groupedSlots);
       } catch {
@@ -257,7 +293,10 @@ const Appointments = () => {
     try {
       const scheduledIso =
         form.appointment_date && form.slot_start_time
-          ? createIslamabadDateTimeValue(form.appointment_date, form.slot_start_time)
+          ? createIslamabadDateTimeValue(
+              form.appointment_date,
+              form.slot_start_time,
+            )
           : "";
 
       await appointmentApi.create({
@@ -337,7 +376,11 @@ const Appointments = () => {
         {success && <p className="alert alert-success">{success}</p>}
 
         {user?.role === "patient" && (
-          <form onSubmit={createAppointment} className="form-grid" style={{ marginTop: 16 }}>
+          <form
+            onSubmit={createAppointment}
+            className="form-grid"
+            style={{ marginTop: 16 }}
+          >
             <label>
               Doctor
               <select
@@ -391,7 +434,11 @@ const Appointments = () => {
                     }))
                   }
                   required
-                  disabled={!form.doctor_user_id || !form.appointment_date || loadingSlots}
+                  disabled={
+                    !form.doctor_user_id ||
+                    !form.appointment_date ||
+                    loadingSlots
+                  }
                 >
                   <option value="">
                     {loadingSlots ? "Loading slots..." : "Select a slot"}
@@ -411,8 +458,13 @@ const Appointments = () => {
                 <div className="list-stack">
                   {weekSlots.map((group) => (
                     <div className="list-item" key={group.date}>
-                      <strong>{group.day}, {group.date}</strong>
-                      <div className="inline-actions wrap" style={{ marginTop: 8 }}>
+                      <strong>
+                        {group.day}, {group.date}
+                      </strong>
+                      <div
+                        className="inline-actions wrap"
+                        style={{ marginTop: 8 }}
+                      >
                         {group.slots.length ? (
                           group.slots.map((slot) => (
                             <button
@@ -462,9 +514,7 @@ const Appointments = () => {
 
       <section className="panel">
         <h3>
-          {user?.role === "doctor"
-            ? "Your schedule"
-            : "Your appointments"}
+          {user?.role === "doctor" ? "Your schedule" : "Your appointments"}
         </h3>
         <div className="table-wrap">
           <table>

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { userApi, appointmentApi, availabilityApi, chatApi, getErrorMessage } from "../utils/apiHelper";
+import {
+  userApi,
+  appointmentApi,
+  availabilityApi,
+  chatApi,
+  getErrorMessage,
+} from "../utils/apiHelper";
 import { getStoredUser } from "../utils/session";
 import {
   createIslamabadDateTimeValue,
@@ -8,6 +14,8 @@ import {
   getIslamabadDateValue,
   getIslamabadTimeValue,
   getIslamabadWeekday,
+  isFutureSlotStrict,
+  createIslamabadDateTimeIso,
 } from "../utils/dateTime";
 
 const DoctorsBySpecialization = () => {
@@ -35,7 +43,8 @@ const DoctorsBySpecialization = () => {
       setLoading(true);
       setError("");
       try {
-        const response = await userApi.getDoctorsBySpecialization(specialization);
+        const response =
+          await userApi.getDoctorsBySpecialization(specialization);
         setDoctors(Array.isArray(response.data) ? response.data : []);
       } catch {
         setError("Failed to load doctors for this specialization.");
@@ -83,17 +92,31 @@ const DoctorsBySpecialization = () => {
         const bookedStarts = new Set(
           (appointmentsResponse.data || [])
             .filter((appointment) => appointment.status !== "cancelled")
-            .filter((appointment) => toLocalDateValue(appointment.scheduled_at) === schedule.appointment_date)
-            .map((appointment) => getIslamabadTimeValue(appointment.scheduled_at)),
+            .filter(
+              (appointment) =>
+                toLocalDateValue(appointment.scheduled_at) ===
+                schedule.appointment_date,
+            )
+            .map((appointment) =>
+              getIslamabadTimeValue(appointment.scheduled_at),
+            ),
         );
 
         const slots = (availabilityResponse.data || [])
           .filter((slot) => slot.day_of_week === selectedDay)
-          .filter((slot) => !bookedStarts.has(String(slot.start_time).slice(0, 5)));
+          .filter(
+            (slot) => !bookedStarts.has(String(slot.start_time).slice(0, 5)),
+          )
+          // Filter to only show future slots
+          .filter((slot) =>
+            isFutureSlotStrict(schedule.appointment_date, slot.start_time),
+          );
 
         setAvailableSlots(slots);
         if (slots.length === 0) {
-          setError(`No available slots for ${bookingFor.full_name} on ${selectedDay}.`);
+          setError(
+            `No available slots for ${bookingFor.full_name} on ${selectedDay}.`,
+          );
         }
       } catch (err) {
         setAvailableSlots([]);
@@ -115,7 +138,10 @@ const DoctorsBySpecialization = () => {
       setMessage("");
       const scheduledIso =
         schedule.appointment_date && schedule.slot_start_time
-          ? createIslamabadDateTimeValue(schedule.appointment_date, schedule.slot_start_time)
+          ? createIslamabadDateTimeValue(
+              schedule.appointment_date,
+              schedule.slot_start_time,
+            )
           : "";
 
       await appointmentApi.create({
@@ -167,7 +193,9 @@ const DoctorsBySpecialization = () => {
         {message && <p className="alert alert-success">{message}</p>}
 
         {doctors.length === 0 ? (
-          <p className="muted">No verified doctors matched this specialization yet.</p>
+          <p className="muted">
+            No verified doctors matched this specialization yet.
+          </p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -242,7 +270,10 @@ const DoctorsBySpecialization = () => {
               <select
                 value={schedule.slot_start_time}
                 onChange={(e) =>
-                  setSchedule((s) => ({ ...s, slot_start_time: e.target.value }))
+                  setSchedule((s) => ({
+                    ...s,
+                    slot_start_time: e.target.value,
+                  }))
                 }
                 disabled={!schedule.appointment_date || loadingSlots}
                 required

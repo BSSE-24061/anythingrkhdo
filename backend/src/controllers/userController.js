@@ -3,6 +3,51 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 
+// Password validation function
+const validatePassword = (password) => {
+  if (!password) {
+    return { valid: false, message: "Password is required" };
+  }
+
+  if (password.length < 8) {
+    return {
+      valid: false,
+      message: "Password must be at least 8 characters long",
+    };
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return {
+      valid: false,
+      message: "Password must contain at least one uppercase letter",
+    };
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return {
+      valid: false,
+      message: "Password must contain at least one lowercase letter",
+    };
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return {
+      valid: false,
+      message: "Password must contain at least one number",
+    };
+  }
+
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return {
+      valid: false,
+      message:
+        "Password must contain at least one special character (!@#$%^&* etc.)",
+    };
+  }
+
+  return { valid: true, message: "Password is strong" };
+};
+
 const buildAuthResponse = (user) => {
   const token = jwt.sign(
     { id: user.user_id, email: user.email, role: user.role },
@@ -166,6 +211,12 @@ const signup = async (req, res) => {
       .json({ error: `Missing required fields: ${missingFields.join(", ")}` });
   }
 
+  // Validate password strength
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.message });
+  }
+
   try {
     const existing = await User.getUserByEmail(email);
     if (existing) {
@@ -282,7 +333,9 @@ const googleLogin = async (req, res) => {
     });
   } catch (err) {
     console.error("Google login error:", err.message);
-    res.status(err.status || 500).json({ error: err.status ? err.message : "Server error" });
+    res
+      .status(err.status || 500)
+      .json({ error: err.status ? err.message : "Server error" });
   }
 };
 
@@ -304,12 +357,15 @@ const googleOnboarding = async (req, res) => {
   const normalizedRole = role?.toLowerCase();
 
   if (!onboardingToken) {
-    return res.status(400).json({ error: "Google onboarding token is required" });
+    return res
+      .status(400)
+      .json({ error: "Google onboarding token is required" });
   }
 
   if (!["patient", "doctor"].includes(normalizedRole)) {
     return res.status(400).json({
-      error: "Choose patient or doctor. Consultant and admin accounts cannot be created with Google onboarding.",
+      error:
+        "Choose patient or doctor. Consultant and admin accounts cannot be created with Google onboarding.",
     });
   }
 
@@ -341,7 +397,9 @@ const googleOnboarding = async (req, res) => {
     if (missingFields.length > 0) {
       return res
         .status(400)
-        .json({ error: `Missing required fields: ${missingFields.join(", ")}` });
+        .json({
+          error: `Missing required fields: ${missingFields.join(", ")}`,
+        });
     }
 
     const existing = await User.getUserByEmail(email);
@@ -359,12 +417,14 @@ const googleOnboarding = async (req, res) => {
       role: normalizedRole,
       gender: gender || null,
       phone: phone || null,
-      date_of_birth: normalizedRole === "patient" ? date_of_birth || null : null,
+      date_of_birth:
+        normalizedRole === "patient" ? date_of_birth || null : null,
       blood_group: normalizedRole === "patient" ? blood_group || null : null,
       address: normalizedRole === "patient" ? address || null : null,
       emergency_contact:
         normalizedRole === "patient" ? emergency_contact || null : null,
-      specialization: normalizedRole === "doctor" ? specialization || null : null,
+      specialization:
+        normalizedRole === "doctor" ? specialization || null : null,
       license_number:
         normalizedRole === "doctor" ? license_number || null : null,
       hospital_name: normalizedRole === "doctor" ? hospital_name || null : null,
@@ -400,10 +460,9 @@ const googleOnboarding = async (req, res) => {
       err.name === "JsonWebTokenError" || err.name === "TokenExpiredError";
 
     res.status(isTokenError ? 401 : 500).json({
-      error:
-        isTokenError
-          ? "Invalid or expired Google onboarding token"
-          : "Server error",
+      error: isTokenError
+        ? "Invalid or expired Google onboarding token"
+        : "Server error",
     });
   }
 };

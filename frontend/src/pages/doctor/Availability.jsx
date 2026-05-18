@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { availabilityApi } from "../../utils/apiHelper";
 import { getStoredUser } from "../../utils/session";
-import { getUpcomingDateForWeekday } from "../../utils/dateTime";
+import {
+  getUpcomingDateForWeekday,
+  getCurrentIslamabadTime,
+  getCurrentIslamabadDate,
+  getIslamabadWeekday,
+} from "../../utils/dateTime";
 
 const getAvailableWeekdays = () => [
   "Monday",
@@ -16,9 +21,13 @@ const getAvailableWeekdays = () => [
 const Availability = () => {
   const user = getStoredUser();
   const daysOfWeek = getAvailableWeekdays();
-  
+
   const [savedSlots, setSavedSlots] = useState([]);
-  const [newSlot, setNewSlot] = useState({ day_of_week: daysOfWeek[0], start_time: "09:00", end_time: "09:30" });
+  const [newSlot, setNewSlot] = useState({
+    day_of_week: daysOfWeek[0],
+    start_time: "09:00",
+    end_time: "09:30",
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -37,7 +46,19 @@ const Availability = () => {
     }
     if (end - start !== 30) return "Each slot must be exactly 30 minutes";
 
-    const sameDaySlots = savedSlots.filter((slot) => slot.day_of_week === newSlot.day_of_week);
+    // Check if trying to add a slot for today that has already passed
+    const today = getCurrentIslamabadDate();
+    const todayWeekday = getIslamabadWeekday(today);
+    const currentTime = getCurrentIslamabadTime();
+    const currentMinutes = timeToMinutes(currentTime);
+
+    if (newSlot.day_of_week === todayWeekday && start <= currentMinutes) {
+      return "Cannot add slots for times that have already passed today";
+    }
+
+    const sameDaySlots = savedSlots.filter(
+      (slot) => slot.day_of_week === newSlot.day_of_week,
+    );
     const overlaps = sameDaySlots.some((slot) => {
       const savedStart = timeToMinutes(slot.start_time);
       const savedEnd = timeToMinutes(slot.end_time);
@@ -46,7 +67,8 @@ const Availability = () => {
     if (overlaps) return "Availability slots cannot overlap";
 
     const totalForDay = sameDaySlots.reduce(
-      (total, slot) => total + timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time),
+      (total, slot) =>
+        total + timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time),
       0,
     );
     if (totalForDay + end - start > 8 * 60) {
@@ -91,13 +113,18 @@ const Availability = () => {
       }
 
       await availabilityApi.addSlot(newSlot);
-      setNewSlot({ day_of_week: daysOfWeek[0], start_time: "09:00", end_time: "09:30" });
+      setNewSlot({
+        day_of_week: daysOfWeek[0],
+        start_time: "09:00",
+        end_time: "09:30",
+      });
       setError("");
       await loadAvailability();
     } catch (err) {
       console.error("Full error object:", err);
       console.error("Response data:", err?.response?.data);
-      const errorMessage = err?.response?.data?.error || err?.message || "Failed to add slot";
+      const errorMessage =
+        err?.response?.data?.error || err?.message || "Failed to add slot";
       setError(errorMessage);
     }
   };
@@ -117,7 +144,10 @@ const Availability = () => {
       <section className="page-heading">
         <div>
           <h1>Doctor Availability</h1>
-          <p className="muted">Set your available appointment slots so patients can book when you're available.</p>
+          <p className="muted">
+            Set your available appointment slots so patients can book when
+            you're available.
+          </p>
         </div>
       </section>
 
@@ -126,7 +156,8 @@ const Availability = () => {
           <h3>Add New Availability Slot</h3>
         </div>
         <p className="muted">
-          Slots are weekly duty slots. Patients can book only matching real dates and remaining times.
+          Slots are weekly duty slots. Patients can book only matching real
+          dates and remaining times.
         </p>
 
         {error && <p style={{ color: "red", marginBottom: 12 }}>{error}</p>}
@@ -136,12 +167,16 @@ const Availability = () => {
             Weekday
             <select
               value={newSlot.day_of_week}
-              onChange={(e) => setNewSlot({ ...newSlot, day_of_week: e.target.value })}
+              onChange={(e) =>
+                setNewSlot({ ...newSlot, day_of_week: e.target.value })
+              }
             >
               {daysOfWeek.map((day) => (
                 <option key={day} value={day}>
                   {day}
-                  {getUpcomingDateForWeekday(day) ? `, ${getUpcomingDateForWeekday(day)}` : ""}
+                  {getUpcomingDateForWeekday(day)
+                    ? `, ${getUpcomingDateForWeekday(day)}`
+                    : ""}
                 </option>
               ))}
             </select>
@@ -153,7 +188,9 @@ const Availability = () => {
               type="time"
               step="1800"
               value={newSlot.start_time}
-              onChange={(e) => setNewSlot({ ...newSlot, start_time: e.target.value })}
+              onChange={(e) =>
+                setNewSlot({ ...newSlot, start_time: e.target.value })
+              }
             />
           </label>
 
@@ -163,7 +200,9 @@ const Availability = () => {
               type="time"
               step="1800"
               value={newSlot.end_time}
-              onChange={(e) => setNewSlot({ ...newSlot, end_time: e.target.value })}
+              onChange={(e) =>
+                setNewSlot({ ...newSlot, end_time: e.target.value })
+              }
             />
           </label>
 
@@ -204,7 +243,9 @@ const Availability = () => {
             ))}
           </div>
         ) : (
-          <p className="muted">No availability slots set yet. Add some to get started!</p>
+          <p className="muted">
+            No availability slots set yet. Add some to get started!
+          </p>
         )}
       </section>
     </>
@@ -212,4 +253,3 @@ const Availability = () => {
 };
 
 export default Availability;
-

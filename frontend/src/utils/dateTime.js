@@ -1,7 +1,8 @@
 const APP_TIME_ZONE = "Asia/Karachi";
 const APP_TIME_ZONE_OFFSET = "+05:00";
 
-const getPart = (parts, type) => parts.find((part) => part.type === type)?.value;
+const getPart = (parts, type) =>
+  parts.find((part) => part.type === type)?.value;
 
 const toAppDate = (value) => {
   if (value instanceof Date) return value;
@@ -75,7 +76,9 @@ export const createIslamabadDateTimeIso = (dateValue, timeValue) => {
   if (!dateValue || !timeValue) return "";
 
   const normalizedTime = String(timeValue).slice(0, 5);
-  const date = new Date(`${dateValue}T${normalizedTime}:00${APP_TIME_ZONE_OFFSET}`);
+  const date = new Date(
+    `${dateValue}T${normalizedTime}:00${APP_TIME_ZONE_OFFSET}`,
+  );
 
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 };
@@ -101,4 +104,33 @@ export const getUpcomingDateForWeekday = (weekday) => {
   }
 
   return "";
+};
+
+// Get current time in Islamabad timezone as HH:MM format
+export const getCurrentIslamabadTime = () => {
+  return getIslamabadTimeValue(new Date());
+};
+
+// Get current date in Islamabad timezone as YYYY-MM-DD format
+export const getCurrentIslamabadDate = () => {
+  return getIslamabadDateValue(new Date());
+};
+
+// Check if a given time on a given date has already passed
+export const hasTimePassed = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return true;
+
+  const iso = createIslamabadDateTimeIso(dateValue, timeValue);
+  return !iso || new Date(iso).getTime() <= Date.now();
+};
+
+// Check if a slot is in the future (strict check for appointment booking)
+export const isFutureSlotStrict = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return false;
+
+  const iso = createIslamabadDateTimeIso(dateValue, timeValue);
+  if (!iso) return false;
+
+  // Add 5 seconds buffer to ensure it's truly in the future
+  return new Date(iso).getTime() > Date.now() + 5000;
 };

@@ -56,6 +56,20 @@ const Signup = () => {
     return trimmed === "" ? null : trimmed;
   };
 
+  // Password validation function
+  const validatePassword = (pwd) => {
+    const requirements = {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      lowercase: /[a-z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
+    };
+
+    const isValid = Object.values(requirements).every((req) => req);
+    return { isValid, requirements };
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
@@ -277,7 +291,16 @@ const Signup = () => {
             </>
           )}
 
-          <button type="submit" className="btn-main" disabled={loading}>
+          <button
+            type="submit"
+            className="btn-main"
+            disabled={loading || !validatePassword(formData.password).isValid}
+            title={
+              !validatePassword(formData.password).isValid
+                ? "Password must meet all requirements"
+                : ""
+            }
+          >
             {loading ? "Creating Account..." : "Create Account"}
           </button>
         </form>

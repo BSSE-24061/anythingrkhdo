@@ -1,42 +1,52 @@
 [
   {
-    "column_name": "post_id",
-    "data_type": "uuid"
+    "column_name": "article_id",
+    "data_type": "uuid",
+    "udt_name": "uuid"
   },
   {
-    "column_name": "user_id",
-    "data_type": "uuid"
-  },
-  {
-    "column_name": "category",
-    "data_type": "character varying"
+    "column_name": "author_user_id",
+    "data_type": "uuid",
+    "udt_name": "uuid"
   },
   {
     "column_name": "title",
-    "data_type": "character varying"
+    "data_type": "character varying",
+    "udt_name": "varchar"
   },
   {
     "column_name": "body",
-    "data_type": "text"
+    "data_type": "text",
+    "udt_name": "text"
+  },
+  {
+    "column_name": "cover_image",
+    "data_type": "text",
+    "udt_name": "text"
+  },
+  {
+    "column_name": "category",
+    "data_type": "character varying",
+    "udt_name": "varchar"
   },
   {
     "column_name": "status",
-    "data_type": "USER-DEFINED"
-  },
-  {
-    "column_name": "views_count",
-    "data_type": "integer"
-  },
-  {
-    "column_name": "created_at",
-    "data_type": "timestamp without time zone"
-  },
-  {
-    "column_name": "updated_at",
-    "data_type": "timestamp without time zone"
+    "data_type": "USER-DEFINED",
+    "udt_name": "forum_status"
   },
   {
     "column_name": "likes_count",
-    "data_type": "integer"
+    "data_type": "integer",
+    "udt_name": "int4"
+  },
+  {
+    "column_name": "published_at",
+    "data_type": "timestamp without time zone",
+    "udt_name": "timestamp"
+  },
+  {
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "udt_name": "timestamp"
   }
 ]

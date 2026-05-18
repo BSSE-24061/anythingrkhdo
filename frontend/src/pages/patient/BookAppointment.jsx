@@ -18,11 +18,37 @@ const BookAppointment = () => {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
   const [error, setError] = useState('');
 
   const toLocalDateValue = (value) => {
     return getIslamabadDateValue(value);
+  };
+
+  // Generate the next 30 upcoming dates starting from tomorrow
+  const getUpcomingDates = () => {
+    const dates = [];
+    const todayValue = getIslamabadDateValue(new Date());
+    const start = new Date(`${todayValue}T00:00:00+05:00`);
+    
+    for (let offset = 1; offset <= 30; offset++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + offset);
+      const dateValue = getIslamabadDateValue(date);
+      const weekday = getIslamabadWeekday(dateValue);
+      dates.push({
+        dateValue,
+        weekday,
+        formatted: new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(date)
+      });
+    }
+    return dates;
   };
 
   // Load all doctors
@@ -45,46 +71,64 @@ const BookAppointment = () => {
     loadDoctors();
   }, []);
 
-  // Load availability when doctor is selected or date changes
-  useEffect(() => {
-    if (selectedDoctor && selectedDate) {
-      loadAvailableSlots();
+  const loadDoctorAvailability = async (doctorId) => {
+    if (!doctorId) {
+      setAvailableDates([]);
+      setAvailableSlots([]);
+      return;
     }
-  }, [selectedDoctor, selectedDate]);
 
-  const loadAvailableSlots = async () => {
     try {
       setSlotLoading(true);
+      setError('');
+      
       const [availabilityResponse, appointmentsResponse] = await Promise.all([
-        availabilityApi.getDoctor(selectedDoctor),
-        appointmentApi.byDoctor(selectedDoctor),
+        availabilityApi.getDoctor(doctorId),
+        appointmentApi.byDoctor(doctorId),
       ]);
+      
       const slots = availabilityResponse.data || [];
+      const appointments = appointmentsResponse.data || [];
 
-      const dayName = getIslamabadWeekday(selectedDate);
+      const upcoming = getUpcomingDates();
+      const validDates = [];
 
-      const bookedStarts = new Set(
-        (appointmentsResponse.data || [])
-          .filter((appointment) => appointment.status !== 'cancelled')
-          .filter((appointment) => toLocalDateValue(appointment.scheduled_at) === selectedDate)
-          .map((appointment) => getIslamabadTimeValue(appointment.scheduled_at))
-      );
+      for (const d of upcoming) {
+        // Find slots matching this day of week
+        const daySlots = slots.filter(slot => slot.day_of_week === d.weekday);
+        if (daySlots.length === 0) continue;
 
-      // Filter slots for this day of week and remove slots that are already booked
-      const todaysSlots = slots
-        .filter(slot => slot.day_of_week === dayName)
-        .filter(slot => !bookedStarts.has(String(slot.start_time).slice(0, 5)));
-      setAvailableSlots(todaysSlots);
+        // Find existing appointments for this specific date
+        const bookedStarts = new Set(
+          appointments
+            .filter((appointment) => appointment.status !== 'cancelled')
+            .filter((appointment) => toLocalDateValue(appointment.scheduled_at) === d.dateValue)
+            .map((appointment) => getIslamabadTimeValue(appointment.scheduled_at))
+        );
 
-      if (todaysSlots.length === 0) {
-        setError(`Doctor is not available on ${dayName}s`);
+        // Check if there is at least one slot that is NOT booked
+        const unbookedSlots = daySlots.filter(
+          slot => !bookedStarts.has(String(slot.start_time).slice(0, 5))
+        );
+
+        if (unbookedSlots.length > 0) {
+          validDates.push({
+            ...d,
+            slots: unbookedSlots
+          });
+        }
+      }
+
+      setAvailableDates(validDates);
+      if (validDates.length === 0) {
+        setError('This doctor has no available slots in the next 30 days.');
       } else {
         setError('');
       }
     } catch (err) {
       console.error(err);
-      setError('Failed to load availability');
-      setAvailableSlots([]);
+      setError('Failed to load doctor availability');
+      setAvailableDates([]);
     } finally {
       setSlotLoading(false);
     }
@@ -115,16 +159,11 @@ const BookAppointment = () => {
       setSelectedTime('');
       setReason('');
       setAvailableSlots([]);
+      setAvailableDates([]);
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to book appointment');
       console.error(err);
     }
-  };
-
-  const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
   };
 
   if (loading) return <div><p>Loading doctors...</p></div>;
@@ -147,9 +186,12 @@ const BookAppointment = () => {
             <select
               value={selectedDoctor}
               onChange={(e) => {
-                setSelectedDoctor(e.target.value);
+                const docId = e.target.value;
+                setSelectedDoctor(docId);
+                setSelectedDate('');
                 setSelectedTime('');
                 setAvailableSlots([]);
+                loadDoctorAvailability(docId);
               }}
             >
               <option value="">Choose a doctor ({doctors.length} available)</option>
@@ -163,20 +205,36 @@ const BookAppointment = () => {
 
           <div>
             <label>Select Date</label>
-            <input
-              type="date"
+            <select
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              min={getMinDate()}
-            />
+              onChange={(e) => {
+                const dateVal = e.target.value;
+                setSelectedDate(dateVal);
+                setSelectedTime('');
+                if (dateVal) {
+                  const dateObj = availableDates.find(d => d.dateValue === dateVal);
+                  setAvailableSlots(dateObj ? dateObj.slots : []);
+                } else {
+                  setAvailableSlots([]);
+                }
+              }}
+              disabled={!selectedDoctor || slotLoading}
+            >
+              <option value="">
+                {slotLoading ? 'Loading available dates...' : selectedDoctor ? 'Choose a date' : 'Please select a doctor first'}
+              </option>
+              {availableDates.map((d) => (
+                <option key={d.dateValue} value={d.dateValue}>
+                  {d.formatted}
+                </option>
+              ))}
+            </select>
           </div>
 
           {selectedDoctor && selectedDate && (
             <div>
               <label>Select Time</label>
-              {slotLoading ? (
-                <p className="muted">Loading available times...</p>
-              ) : availableSlots.length > 0 ? (
+              {availableSlots.length > 0 ? (
                 <select
                   value={selectedTime}
                   onChange={(e) => setSelectedTime(e.target.value)}

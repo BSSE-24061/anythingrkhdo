@@ -1,7 +1,8 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-// Create a new connection pool using the details from your .env file
+console.log("DB_PASSWORD in env:", typeof process.env.DB_PASSWORD, JSON.stringify(process.env.DB_PASSWORD));
+
 const pool = new Pool({
   user: process.env.DB_USER,
   password: String(process.env.DB_PASSWORD),
@@ -10,14 +11,14 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-// Test the connection
+console.log("Pool password option:", typeof pool.options.password, JSON.stringify(pool.options.password));
+
 pool.connect((err, client, release) => {
   if (err) {
-    console.error("Error acquiring client", err.stack);
+    console.error("Error connecting:", err);
   } else {
-    console.log("Successfully connected to PostgreSQL database!");
+    console.log("Connected successfully!");
   }
   if (client) release();
+  pool.end();
 });
-
-module.exports = pool;

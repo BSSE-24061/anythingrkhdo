@@ -259,9 +259,8 @@ const updateArticleStatus = async (articleId, status) => {
   const query = `
         UPDATE blog_articles
         SET status = $1::forum_status,
-            published_at = CASE WHEN $1 = 'active' AND published_at IS NULL THEN NOW() ELSE published_at END,
-            updated_at = NOW()
-        WHERE article_id = $2
+            published_at = CASE WHEN $1::text = 'active' AND published_at IS NULL THEN NOW() ELSE published_at END
+        WHERE article_id = $2::uuid
         RETURNING *;
     `;
   const result = await db.query(query, [status, articleId]);
@@ -270,7 +269,7 @@ const updateArticleStatus = async (articleId, status) => {
 
 const deleteArticle = async (articleId) => {
   const result = await db.query(
-    `UPDATE blog_articles SET status = 'deleted', updated_at = NOW() WHERE article_id = $1 RETURNING *;`,
+    `UPDATE blog_articles SET status = 'deleted'::forum_status WHERE article_id = $1::uuid RETURNING *;`,
     [articleId],
   );
   return result.rows[0];

@@ -15,6 +15,7 @@ import {
   getIslamabadDateValue,
   getIslamabadTimeValue,
   getIslamabadWeekday,
+  isFutureSlotStrict,
 } from "../../utils/dateTime";
 
 const statusLabel = (status) => (status === "cancelled" ? "rejected" : status);
@@ -56,8 +57,7 @@ const rangesOverlap = (startA, endA, startB, endB) =>
   startA < endB && endA > startB;
 
 const isFutureSlot = (dateValue, timeValue) => {
-  const iso = createIslamabadDateTimeIso(dateValue, timeValue);
-  return iso && new Date(iso).getTime() > Date.now();
+  return isFutureSlotStrict(dateValue, timeValue);
 };
 
 const pillForStatus = (status) => {
@@ -162,12 +162,10 @@ const Appointments = () => {
       setError("");
 
       try {
-        const [availabilityResponse, appointmentsResponse] = await Promise.all(
-          [
-            availabilityApi.getDoctor(form.doctor_user_id),
-            appointmentApi.byDoctor(form.doctor_user_id),
-          ],
-        );
+        const [availabilityResponse, appointmentsResponse] = await Promise.all([
+          availabilityApi.getDoctor(form.doctor_user_id),
+          appointmentApi.byDoctor(form.doctor_user_id),
+        ]);
 
         const selectedDay = getIslamabadWeekday(form.appointment_date);
 
@@ -182,8 +180,7 @@ const Appointments = () => {
             const start = timeToMinutes(
               getIslamabadTimeValue(appointment.scheduled_at),
             );
-            const duration =
-              Number(appointment.duration_minutes) || 30;
+            const duration = Number(appointment.duration_minutes) || 30;
             return { start, end: start + duration };
           });
 
@@ -194,14 +191,21 @@ const Appointments = () => {
             const windowEnd = timeToMinutes(slot.end_time);
             const generatedSlots = [];
 
-            for (let start = windowStart; start + 30 <= windowEnd; start += 30) {
+            for (
+              let start = windowStart;
+              start + 30 <= windowEnd;
+              start += 30
+            ) {
               const end = start + 30;
 
               const isBooked = bookedRanges.some((booking) =>
                 rangesOverlap(start, end, booking.start, booking.end),
               );
 
-              if (!isBooked && isFutureSlot(form.appointment_date, minutesToTime(start))) {
+              if (
+                !isBooked &&
+                isFutureSlot(form.appointment_date, minutesToTime(start))
+              ) {
                 generatedSlots.push({
                   availability_id: `${slot.availability_id}-${start}`,
                   start_time: minutesToTime(start),
@@ -238,59 +242,65 @@ const Appointments = () => {
       }
 
       try {
-        const [availabilityResponse, appointmentsResponse] = await Promise.all(
-          [
-            availabilityApi.getDoctor(form.doctor_user_id),
-            appointmentApi.byDoctor(form.doctor_user_id),
-          ],
-        );
+        const [availabilityResponse, appointmentsResponse] = await Promise.all([
+          availabilityApi.getDoctor(form.doctor_user_id),
+          appointmentApi.byDoctor(form.doctor_user_id),
+        ]);
 
         const availability = availabilityResponse.data || [];
         const appointmentsData = appointmentsResponse.data || [];
 
-        const groupedSlots = getNextSevenDays().map(({ date, day }) => {
-          const bookedRanges = appointmentsData
-            .filter((appointment) => appointment.status !== "cancelled")
-            .filter(
-              (appointment) => toLocalDateValue(appointment.scheduled_at) === date,
-            )
-            .map((appointment) => {
-              const start = timeToMinutes(
-                getIslamabadTimeValue(appointment.scheduled_at),
-              );
-              const duration = Number(appointment.duration_minutes) || 30;
-              return { start, end: start + duration };
-            });
-
-          const slots = availability
-            .filter((slot) => slot.day_of_week === day)
-            .flatMap((slot) => {
-              const windowStart = timeToMinutes(slot.start_time);
-              const windowEnd = timeToMinutes(slot.end_time);
-              const generatedSlots = [];
-
-              for (let start = windowStart; start + 30 <= windowEnd; start += 30) {
-                const end = start + 30;
-                const startTime = minutesToTime(start);
-
-                const isBooked = bookedRanges.some((booking) =>
-                  rangesOverlap(start, end, booking.start, booking.end),
+        const groupedSlots = getNextSevenDays()
+          .map(({ date, day }) => {
+            const bookedRanges = appointmentsData
+              .filter((appointment) => appointment.status !== "cancelled")
+              .filter(
+                (appointment) =>
+                  toLocalDateValue(appointment.scheduled_at) === date,
+              )
+              .map((appointment) => {
+                const start = timeToMinutes(
+                  getIslamabadTimeValue(appointment.scheduled_at),
                 );
+                const duration = Number(appointment.duration_minutes) || 30;
+                return { start, end: start + duration };
+              });
 
-                if (!isBooked && isFutureSlot(date, startTime)) {
-                  generatedSlots.push({
-                    id: `${date}-${start}`,
-                    start_time: startTime,
-                    end_time: minutesToTime(end),
-                  });
+            const slots = availability
+              .filter((slot) => slot.day_of_week === day)
+              .flatMap((slot) => {
+                const windowStart = timeToMinutes(slot.start_time);
+                const windowEnd = timeToMinutes(slot.end_time);
+                const generatedSlots = [];
+
+                for (
+                  let start = windowStart;
+                  start + 30 <= windowEnd;
+                  start += 30
+                ) {
+                  const end = start + 30;
+                  const startTime = minutesToTime(start);
+
+                  const isBooked = bookedRanges.some((booking) =>
+                    rangesOverlap(start, end, booking.start, booking.end),
+                  );
+
+                  if (!isBooked && isFutureSlot(date, startTime)) {
+                    generatedSlots.push({
+                      id: `${date}-${start}`,
+                      start_time: startTime,
+                      end_time: minutesToTime(end),
+                    });
+                  }
                 }
-              }
 
-              return generatedSlots;
-            });
+                return generatedSlots;
+              });
 
-          return { date, day, slots };
-        });
+            return { date, day, slots };
+          })
+          // Filter to only show dates with available slots
+          .filter((group) => group.slots.length > 0);
 
         setWeekSlots(groupedSlots);
       } catch {
@@ -349,7 +359,10 @@ const Appointments = () => {
       );
     } catch (err) {
       setError(
-        getErrorMessage(err, "Could not complete booking — check selections and datetime."),
+        getErrorMessage(
+          err,
+          "Could not complete booking — check selections and datetime.",
+        ),
       );
     }
   };
@@ -373,9 +386,16 @@ const Appointments = () => {
     }));
 
     if (tab === "all") return mapped;
-    if (tab === "upcoming") return mapped.filter((a) => a._status === "pending" || a._status === "confirmed");
-    if (tab === "completed") return mapped.filter((a) => a._status === "completed");
-    if (tab === "cancelled") return mapped.filter((a) => a._status === "rejected" || a._status === "cancelled");
+    if (tab === "upcoming")
+      return mapped.filter(
+        (a) => a._status === "pending" || a._status === "confirmed",
+      );
+    if (tab === "completed")
+      return mapped.filter((a) => a._status === "completed");
+    if (tab === "cancelled")
+      return mapped.filter(
+        (a) => a._status === "rejected" || a._status === "cancelled",
+      );
 
     return mapped;
   }, [appointments, tab, user?.role]);
@@ -387,436 +407,612 @@ const Appointments = () => {
 
   return (
     <div className="content-page" style={{ gap: 18 }}>
-        {/* Header / Create Form */}
-        <section className="panel">
-          <p className="eyebrow">Scheduling</p>
-          <h2 style={{ marginTop: 4 }}>Appointments</h2>
-          <p className="muted">
-            {user.role === "doctor"
-              ? "Review your schedule and update visit status."
-              : "Book with a verified doctor or browse specializations to match the right specialist."}
+      {/* Header / Create Form */}
+      <section className="panel">
+        <p className="eyebrow">Scheduling</p>
+        <h2 style={{ marginTop: 4 }}>Appointments</h2>
+        <p className="muted">
+          {user.role === "doctor"
+            ? "Review your schedule and update visit status."
+            : "Book with a verified doctor or browse specializations to match the right specialist."}
+        </p>
+
+        {user.role === "patient" && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            Prefer to pick by specialty?{" "}
+            <Link
+              to="/specializations"
+              style={{ color: "var(--accent)", fontWeight: 800 }}
+            >
+              Browse specializations
+            </Link>{" "}
+            or{" "}
+            <Link
+              to="/consultant"
+              style={{ color: "var(--accent)", fontWeight: 800 }}
+            >
+              talk to a consultant
+            </Link>{" "}
+            if you are unsure who to see.
           </p>
+        )}
 
-          {user.role === "patient" && (
-            <p className="muted" style={{ marginTop: 8 }}>
-              Prefer to pick by specialty?{" "}
-              <Link to="/specializations" style={{ color: "var(--accent)", fontWeight: 800 }}>
-                Browse specializations
-              </Link>{" "}
-              or{" "}
-              <Link to="/consultant" style={{ color: "var(--accent)", fontWeight: 800 }}>
-                talk to a consultant
-              </Link>{" "}
-              if you are unsure who to see.
-            </p>
-          )}
+        {error && <p className="error-text">{error}</p>}
+        {success && <p className="alert alert-success">{success}</p>}
 
-          {error && <p className="error-text">{error}</p>}
-          {success && <p className="alert alert-success">{success}</p>}
+        {user.role === "patient" && (
+          <>
+            <div style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn-main"
+                onClick={() => setBookingOpen(true)}
+              >
+                + Book New Appointment
+              </button>
+            </div>
 
-          {user.role === "patient" && (
-            <>
-              <div style={{ marginTop: 16 }}>
-                <button
-                  type="button"
-                  className="btn-main"
-                  onClick={() => setBookingOpen(true)}
-                >
-                  + Book New Appointment
-                </button>
-              </div>
-
-              {bookingOpen && (
+            {bookingOpen && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(15, 23, 42, 0.45)",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 16,
+                  zIndex: 1000,
+                }}
+                onMouseDown={(e) => {
+                  if (e.target === e.currentTarget) setBookingOpen(false);
+                }}
+              >
                 <div
-                  role="dialog"
-                  aria-modal="true"
                   style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(15, 23, 42, 0.45)",
-                    display: "grid",
-                    placeItems: "center",
-                    padding: 16,
-                    zIndex: 1000,
-                  }}
-                  onMouseDown={(e) => {
-                    if (e.target === e.currentTarget) setBookingOpen(false);
+                    width: "min(820px, 100%)",
+                    background: "#ffffff",
+                    borderRadius: 18,
+                    border: "1px solid #e6edf5",
+                    boxShadow: "0 18px 50px rgba(2,6,23,0.25)",
+                    overflow: "hidden",
                   }}
                 >
                   <div
                     style={{
-                      width: "min(820px, 100%)",
-                      background: "#ffffff",
-                      borderRadius: 18,
-                      border: "1px solid #e6edf5",
-                      boxShadow: "0 18px 50px rgba(2,6,23,0.25)",
-                      overflow: "hidden",
+                      padding: "16px 18px",
+                      borderBottom: "1px solid #e6edf5",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    <div
-                      style={{
-                        padding: "16px 18px",
-                        borderBottom: "1px solid #e6edf5",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 18, fontWeight: 950, color: "#0b0b0b" }}>
-                          Book New Appointment
-                        </div>
-                        <div style={{ marginTop: 4, color: "#6b7280", fontWeight: 700, fontSize: 13 }}>
-                          Select doctor, date, time slot, and reason.
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn-ghost small"
-                        style={{ borderRadius: 12 }}
-                        onClick={() => setBookingOpen(false)}
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 950,
+                          color: "#0b0b0b",
+                        }}
                       >
-                        ✕
-                      </button>
+                        Book New Appointment
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#6b7280",
+                          fontWeight: 700,
+                          fontSize: 13,
+                        }}
+                      >
+                        Select doctor, date, time slot, and reason.
+                      </div>
                     </div>
 
-                    <form onSubmit={(e) => { createAppointment(e); setBookingOpen(false); }} style={{ padding: 18 }}>
-                      <div style={{ display: "grid", gap: 14 }}>
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      style={{ borderRadius: 12 }}
+                      onClick={() => setBookingOpen(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      createAppointment(e);
+                      setBookingOpen(false);
+                    }}
+                    style={{ padding: 18 }}
+                  >
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <label style={{ display: "grid", gap: 8 }}>
+                        <div style={{ fontWeight: 950, color: "#0b0b0b" }}>
+                          Select Doctor
+                        </div>
+                        <select
+                          value={form.doctor_user_id}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              doctor_user_id: e.target.value,
+                              slot_start_time: "",
+                            }))
+                          }
+                          required
+                          disabled={loadingDoctors}
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">
+                            {loadingDoctors
+                              ? "Loading doctors..."
+                              : "Choose a doctor"}
+                          </option>
+                          {doctors.map((doc) => (
+                            <option key={doc.user_id} value={doc.user_id}>
+                              {doc.full_name}
+                              {doc.specialization
+                                ? ` — ${doc.specialization}`
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 14,
+                        }}
+                      >
                         <label style={{ display: "grid", gap: 8 }}>
-                          <div style={{ fontWeight: 950, color: "#0b0b0b" }}>Select Doctor</div>
-                          <select
-                            value={form.doctor_user_id}
+                          <div style={{ fontWeight: 950, color: "#0b0b0b" }}>
+                            Date
+                          </div>
+                          <input
+                            type="date"
+                            min={getDateValue(new Date())}
+                            value={form.appointment_date}
                             onChange={(e) =>
                               setForm((prev) => ({
                                 ...prev,
-                                doctor_user_id: e.target.value,
+                                appointment_date: e.target.value,
                                 slot_start_time: "",
                               }))
                             }
                             required
-                            disabled={loadingDoctors}
-                            style={{ width: "100%" }}
+                          />
+                        </label>
+
+                        <label style={{ display: "grid", gap: 8 }}>
+                          <div style={{ fontWeight: 950, color: "#0b0b0b" }}>
+                            Time Slot
+                          </div>
+                          <select
+                            value={form.slot_start_time}
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                slot_start_time: e.target.value,
+                              }))
+                            }
+                            required
+                            disabled={
+                              !form.doctor_user_id ||
+                              !form.appointment_date ||
+                              loadingSlots
+                            }
                           >
                             <option value="">
-                              {loadingDoctors ? "Loading doctors..." : "Choose a doctor"}
+                              {loadingSlots
+                                ? "Loading slots..."
+                                : "Select a time slot"}
                             </option>
-                            {doctors.map((doc) => (
-                              <option key={doc.user_id} value={doc.user_id}>
-                                {doc.full_name}
-                                {doc.specialization ? ` — ${doc.specialization}` : ""}
+                            {availableSlots.map((slot) => (
+                              <option
+                                key={slot.availability_id}
+                                value={slot.start_time}
+                              >
+                                {slot.start_time} - {slot.end_time}
                               </option>
                             ))}
                           </select>
                         </label>
-
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                          <label style={{ display: "grid", gap: 8 }}>
-                            <div style={{ fontWeight: 950, color: "#0b0b0b" }}>Date</div>
-                            <input
-                              type="date"
-                              min={getDateValue(new Date())}
-                              value={form.appointment_date}
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  appointment_date: e.target.value,
-                                  slot_start_time: "",
-                                }))
-                              }
-                              required
-                            />
-                          </label>
-
-                          <label style={{ display: "grid", gap: 8 }}>
-                            <div style={{ fontWeight: 950, color: "#0b0b0b" }}>Time Slot</div>
-                            <select
-                              value={form.slot_start_time}
-                              onChange={(e) =>
-                                setForm((prev) => ({ ...prev, slot_start_time: e.target.value }))
-                              }
-                              required
-                              disabled={!form.doctor_user_id || !form.appointment_date || loadingSlots}
-                            >
-                              <option value="">
-                                {loadingSlots ? "Loading slots..." : "Select a time slot"}
-                              </option>
-                              {availableSlots.map((slot) => (
-                                <option key={slot.availability_id} value={slot.start_time}>
-                                  {slot.start_time} - {slot.end_time}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-
-                        <label style={{ display: "grid", gap: 8 }}>
-                          <div style={{ fontWeight: 950, color: "#0b0b0b" }}>
-                            Reason for Visit
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Describe your symptoms or reason for appointment..."
-                            value={form.reason}
-                            onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
-                            required
-                            style={{ width: "100%" }}
-                          />
-                        </label>
-
-                        {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
-                        {success && <p className="alert alert-success" style={{ margin: 0 }}>{success}</p>}
                       </div>
 
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          gap: 12,
-                          marginTop: 18,
-                          paddingTop: 14,
-                          borderTop: "1px solid #e6edf5",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="btn-ghost small"
-                          onClick={() => setBookingOpen(false)}
+                      <label style={{ display: "grid", gap: 8 }}>
+                        <div style={{ fontWeight: 950, color: "#0b0b0b" }}>
+                          Reason for Visit
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Describe your symptoms or reason for appointment..."
+                          value={form.reason}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              reason: e.target.value,
+                            }))
+                          }
+                          required
+                          style={{ width: "100%" }}
+                        />
+                      </label>
+
+                      {error && (
+                        <p className="error-text" style={{ margin: 0 }}>
+                          {error}
+                        </p>
+                      )}
+                      {success && (
+                        <p
+                          className="alert alert-success"
+                          style={{ margin: 0 }}
                         >
-                          Cancel
-                        </button>
+                          {success}
+                        </p>
+                      )}
+                    </div>
 
-                        <button type="submit" className="btn-main small">
-                          Confirm Booking
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* Appointments View */}
-        <section className="panel">
-          {!showDoctorTable && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                {[
-                  { key: "all", label: "All" },
-                  { key: "upcoming", label: "Upcoming" },
-                  { key: "completed", label: "Completed" },
-                  { key: "cancelled", label: "Cancelled" },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setTab(t.key)}
-                    className={tab === t.key ? "btn-main small" : "btn-ghost small"}
-                    style={{
-                      paddingInline: 18,
-                      ...(tab === t.key
-                        ? { background: "var(--accent)", borderColor: "transparent" }
-                        : { borderColor: "var(--line)" }),
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {showDoctorTable ? (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Patient</th>
-                    <th>When</th>
-                    <th>Reason</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {appointments.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="muted">
-                        No appointments found.
-                      </td>
-                    </tr>
-                  )}
-                  {appointments.map((item) => (
-                    <tr key={item.appointment_id}>
-                      <td>{item.patient_name || item.patient_user_id}</td>
-                      <td>{formatIslamabadDateTime(item.scheduled_at)}</td>
-                      <td>{item.reason}</td>
-                      <td>{statusLabel(item.status)}</td>
-                      <td>
-                        <div className="inline-actions">
-                          {item.status === "pending" && (
-                            <>
-                              <button
-                                type="button"
-                                className="btn-ghost small"
-                                onClick={() => updateStatus(item.appointment_id, "confirmed")}
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-ghost small"
-                                onClick={() => updateStatus(item.appointment_id, "cancelled")}
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                          {item.status === "confirmed" && (
-                            <>
-                              <Link
-                                to={`/chat?room=${item.patient_user_id}`}
-                                className="btn-main small"
-                                style={{ paddingInline: 18, textDecoration: "none", display: "inline-grid", placeItems: "center" }}
-                              >
-                                Chat
-                              </Link>
-                              <button
-                                type="button"
-                                className="btn-ghost small"
-                                onClick={() => updateStatus(item.appointment_id, "completed")}
-                              >
-                                Mark Done
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-              {filteredAppointments.length === 0 ? (
-                <div style={{ gridColumn: "1 / -1", color: "#6b7280", fontWeight: 800 }}>
-                  No appointments for this filter.
-                </div>
-              ) : (
-                filteredAppointments.map((item) => {
-                  const pill = pillForStatus(item.status);
-                  return (
                     <div
-                      key={item.appointment_id}
                       style={{
-                        border: "1px solid var(--line)",
-                        borderRadius: 16,
-                        padding: 14,
-                        background: "#ffffff",
-                        display: "grid",
-                        gap: 8,
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 12,
+                        marginTop: 18,
+                        paddingTop: 14,
+                        borderTop: "1px solid #e6edf5",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                          <div
-                            style={{
-                              width: 42,
-                              height: 42,
-                              borderRadius: 999,
-                              background: "rgba(37, 99, 235, 0.08)",
-                              border: "1px solid rgba(37, 99, 235, 0.22)",
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 900,
-                              color: "#2563eb",
-                              flex: "0 0 auto",
-                            }}
-                          >
-                            👤
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ color: "#0b0b0b", fontWeight: 950 }}>
-                              {item.doctor_name || item.doctor_user_id}
-                            </div>
-                            <div style={{ color: "#6b7280", fontWeight: 800, fontSize: 12, marginTop: 4 }}>
-                              {item.specialization || "Doctor"}
-                            </div>
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: 999,
-                            fontWeight: 950,
-                            fontSize: 11,
-                            background: pill.background,
-                            color: pill.color,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {statusLabel(item.status)}
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        onClick={() => setBookingOpen(false)}
+                      >
+                        Cancel
+                      </button>
 
-                      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <div style={{ color: "#0b0b0b", fontWeight: 900 }}>
-                            📅 {formatIslamabadDateTime(item.scheduled_at)}
-                          </div>
-                          <div style={{ color: "#6b7280", fontWeight: 800, fontSize: 13 }}>
-                            Reason
-                            <div style={{ color: "#0b0b0b", fontWeight: 950, marginTop: 4 }}>
-                              {item.reason || "—"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <button type="submit" className="btn-main small">
+                        Confirm Booking
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
-                      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-                        <button
-                          type="button"
-                          className="btn-ghost small"
-                          style={{ borderColor: "var(--line)", paddingInline: 18 }}
-                          onClick={() => alert(`Appointment Details:\nDoctor: ${item.doctor_name || item.doctor_user_id}\nDate: ${formatIslamabadDateTime(item.scheduled_at)}\nReason: ${item.reason}\nStatus: ${item.status}`)}
-                        >
-                          View Details
-                        </button>
-                        {(item.status === "pending" || item.status === "confirmed") && (
+      {/* Appointments View */}
+      <section className="panel">
+        {!showDoctorTable && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {[
+                { key: "all", label: "All" },
+                { key: "upcoming", label: "Upcoming" },
+                { key: "completed", label: "Completed" },
+                { key: "cancelled", label: "Cancelled" },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={
+                    tab === t.key ? "btn-main small" : "btn-ghost small"
+                  }
+                  style={{
+                    paddingInline: 18,
+                    ...(tab === t.key
+                      ? {
+                          background: "var(--accent)",
+                          borderColor: "transparent",
+                        }
+                      : { borderColor: "var(--line)" }),
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showDoctorTable ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>When</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appointments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      No appointments found.
+                    </td>
+                  </tr>
+                )}
+                {appointments.map((item) => (
+                  <tr key={item.appointment_id}>
+                    <td>{item.patient_name || item.patient_user_id}</td>
+                    <td>{formatIslamabadDateTime(item.scheduled_at)}</td>
+                    <td>{item.reason}</td>
+                    <td>{statusLabel(item.status)}</td>
+                    <td>
+                      <div className="inline-actions">
+                        {item.status === "pending" && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-ghost small"
+                              onClick={() =>
+                                updateStatus(item.appointment_id, "confirmed")
+                              }
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost small"
+                              onClick={() =>
+                                updateStatus(item.appointment_id, "cancelled")
+                              }
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {item.status === "confirmed" && (
                           <>
                             <Link
-                              to={`/chat?room=${item.doctor_user_id}`}
+                              to={`/chat?room=${item.patient_user_id}`}
                               className="btn-main small"
-                              style={{ paddingInline: 18, textDecoration: "none", display: "inline-grid", placeItems: "center" }}
+                              style={{
+                                paddingInline: 18,
+                                textDecoration: "none",
+                                display: "inline-grid",
+                                placeItems: "center",
+                              }}
                             >
                               Chat
                             </Link>
                             <button
                               type="button"
                               className="btn-ghost small"
-                              style={{ borderColor: "var(--danger)", color: "var(--danger)", paddingInline: 18 }}
-                              onClick={() => {
-                                if (window.confirm("Are you sure you want to cancel this appointment?")) {
-                                  updateStatus(item.appointment_id, "cancelled");
-                                }
-                              }}
+                              onClick={() =>
+                                updateStatus(item.appointment_id, "completed")
+                              }
                             >
-                              Cancel
+                              Mark Done
                             </button>
                           </>
                         )}
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 14,
+            }}
+          >
+            {filteredAppointments.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  color: "#6b7280",
+                  fontWeight: 800,
+                }}
+              >
+                No appointments for this filter.
+              </div>
+            ) : (
+              filteredAppointments.map((item) => {
+                const pill = pillForStatus(item.status);
+                return (
+                  <div
+                    key={item.appointment_id}
+                    style={{
+                      border: "1px solid var(--line)",
+                      borderRadius: 16,
+                      padding: 14,
+                      background: "#ffffff",
+                      display: "grid",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 999,
+                            background: "rgba(37, 99, 235, 0.08)",
+                            border: "1px solid rgba(37, 99, 235, 0.22)",
+                            display: "grid",
+                            placeItems: "center",
+                            fontWeight: 900,
+                            color: "#2563eb",
+                            flex: "0 0 auto",
+                          }}
+                        >
+                          👤
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: "#0b0b0b", fontWeight: 950 }}>
+                            {item.doctor_name || item.doctor_user_id}
+                          </div>
+                          <div
+                            style={{
+                              color: "#6b7280",
+                              fontWeight: 800,
+                              fontSize: 12,
+                              marginTop: 4,
+                            }}
+                          >
+                            {item.specialization || "Doctor"}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 999,
+                          fontWeight: 950,
+                          fontSize: 11,
+                          background: pill.background,
+                          color: pill.color,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {statusLabel(item.status)}
+                      </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </section>
-      </div>
+
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--line)",
+                        paddingTop: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ color: "#0b0b0b", fontWeight: 900 }}>
+                          📅 {formatIslamabadDateTime(item.scheduled_at)}
+                        </div>
+                        <div
+                          style={{
+                            color: "#6b7280",
+                            fontWeight: 800,
+                            fontSize: 13,
+                          }}
+                        >
+                          Reason
+                          <div
+                            style={{
+                              color: "#0b0b0b",
+                              fontWeight: 950,
+                              marginTop: 4,
+                            }}
+                          >
+                            {item.reason || "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        justifyContent: "flex-end",
+                        marginTop: 4,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        style={{
+                          borderColor: "var(--line)",
+                          paddingInline: 18,
+                        }}
+                        onClick={() =>
+                          alert(
+                            `Appointment Details:\nDoctor: ${item.doctor_name || item.doctor_user_id}\nDate: ${formatIslamabadDateTime(item.scheduled_at)}\nReason: ${item.reason}\nStatus: ${item.status}`,
+                          )
+                        }
+                      >
+                        View Details
+                      </button>
+                      {(item.status === "pending" ||
+                        item.status === "confirmed") && (
+                        <>
+                          <Link
+                            to={`/chat?room=${item.doctor_user_id}`}
+                            className="btn-main small"
+                            style={{
+                              paddingInline: 18,
+                              textDecoration: "none",
+                              display: "inline-grid",
+                              placeItems: "center",
+                            }}
+                          >
+                            Chat
+                          </Link>
+                          <button
+                            type="button"
+                            className="btn-ghost small"
+                            style={{
+                              borderColor: "var(--danger)",
+                              color: "var(--danger)",
+                              paddingInline: 18,
+                            }}
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  "Are you sure you want to cancel this appointment?",
+                                )
+                              ) {
+                                updateStatus(item.appointment_id, "cancelled");
+                              }
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </section>
+    </div>
   );
 };
 
