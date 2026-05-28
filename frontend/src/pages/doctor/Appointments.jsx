@@ -6,6 +6,8 @@ import { formatIslamabadDateTime } from "../../utils/dateTime";
 
 const statusLabel = (status) => (status === "cancelled" ? "rejected" : status);
 
+const statusClass = (status) => `doctor-status-pill status-${status || "unknown"}`;
+
 const Appointments = () => {
   const user = getStoredUser();
   const navigate = useNavigate();
@@ -68,16 +70,18 @@ const Appointments = () => {
   const rejectedAppointments = appointments.filter((appointment) => appointment.status === "cancelled");
 
   const renderAppointment = (appointment) => (
-    <div className="card" key={appointment.appointment_id}>
+    <div className="appointment-card" key={appointment.appointment_id}>
       <div className="section-heading">
         <div>
           <h3>{appointment.patient_name || "Patient"}</h3>
           <span>{formatIslamabadDateTime(appointment.scheduled_at)}</span>
         </div>
-        <span className="page-tag">{statusLabel(appointment.status)}</span>
+        <span className={statusClass(appointment.status)}>
+          {statusLabel(appointment.status)}
+        </span>
       </div>
 
-      <p>{appointment.reason || "No reason provided"}</p>
+      <p className="muted">{appointment.reason || "No reason provided"}</p>
 
       <div className="inline-actions wrap">
         {appointment.status === "pending" && (
@@ -115,7 +119,11 @@ const Appointments = () => {
 
       {error && <p className="error-text">{error}</p>}
 
-      <section className="list-stack">
+      <section className="record-panel">
+        <div className="section-heading">
+          <h3>Active</h3>
+        </div>
+        <div className="resource-grid compact">
         {loading ? (
           <p>Loading appointments...</p>
         ) : activeAppointments.length ? (
@@ -123,27 +131,32 @@ const Appointments = () => {
         ) : (
           <p className="muted">No pending or confirmed appointments.</p>
         )}
+        </div>
       </section>
 
       {!loading && (
-        <section className="list-stack" style={{ marginTop: 20 }}>
+        <section className="record-panel" style={{ marginTop: 20 }}>
           <div className="section-heading">
             <h3>Completed</h3>
           </div>
+          <div className="resource-grid compact">
           {completedAppointments.length
             ? completedAppointments.map(renderAppointment)
             : <p className="muted">No completed appointments.</p>}
+          </div>
         </section>
       )}
 
       {!loading && (
-        <section className="list-stack" style={{ marginTop: 20 }}>
+        <section className="record-panel" style={{ marginTop: 20 }}>
           <div className="section-heading">
             <h3>Rejected</h3>
           </div>
+          <div className="resource-grid compact">
           {rejectedAppointments.length
             ? rejectedAppointments.map(renderAppointment)
             : <p className="muted">No rejected appointments.</p>}
+          </div>
         </section>
       )}
     </>

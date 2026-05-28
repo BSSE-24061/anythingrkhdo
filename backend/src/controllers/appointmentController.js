@@ -206,6 +206,16 @@ const updateStatus = async (req, res) => {
             return res.status(404).json({ error: "Appointment not found" });
         }
 
+        if (requestedStatus === 'completed') {
+            const appointmentTime = new Date(currentAppointment.scheduled_at);
+            const now = new Date();
+            if (now < appointmentTime) {
+                return res.status(400).json({
+                    error: "Cannot mark appointment as completed until the scheduled appointment day and time has passed."
+                });
+            }
+        }
+
         const allowedTransitions = {
             pending: ['confirmed', 'cancelled'],
             confirmed: ['completed', 'cancelled'],

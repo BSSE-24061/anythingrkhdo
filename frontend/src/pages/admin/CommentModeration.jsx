@@ -30,25 +30,22 @@ const AdminCommentModeration = () => {
 
   const handleRemoveContent = async (postId) => {
     try {
-      await forumApi.updatePostStatus(postId, "deleted");
-      setReportedItems((prev) =>
-        prev.filter((item) => item.post_id !== postId),
-      );
-      setSuccessMessage("Content removed successfully!");
+      setError("");
+      await forumApi.deletePost(postId);
+      await loadReportedItems();
+      setSuccessMessage("Content deleted successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError("Failed to remove content.");
+      setError(err?.response?.data?.error || "Failed to delete content.");
       console.error(err);
     }
   };
 
-  const handleDismissReport = async (postId) => {
+  const handleDismissReport = async (reportId) => {
     try {
-      // Keep the post as active (not removing it)
-      await forumApi.updatePostStatus(postId, "active");
-      setReportedItems((prev) =>
-        prev.filter((item) => item.post_id !== postId),
-      );
+      setError("");
+      await forumApi.dismissReport(reportId);
+      await loadReportedItems();
       setSuccessMessage("Report dismissed!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
@@ -193,7 +190,7 @@ const AdminCommentModeration = () => {
                       ✕ Remove Content
                     </button>
                     <button
-                      onClick={() => handleDismissReport(item.post_id)}
+                      onClick={() => handleDismissReport(item.report_id)}
                       className="btn-ghost"
                       style={{
                         padding: "8px 16px",

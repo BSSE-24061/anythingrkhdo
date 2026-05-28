@@ -36,12 +36,16 @@ const getFeed = async (req, res) => {
 
 const getPost = async (req, res) => {
   try {
+    // 1. Increment view count first so the retrieved post contains the updated views
+    await Community.incrementViewCount(req.params.postId);
+
+    // 2. Fetch the post from DB
     const post = await Community.getForumPostById(req.params.postId);
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    await Community.incrementViewCount(req.params.postId);
+    // 3. Fetch replies
     const replies = await Community.getPostReplies(req.params.postId);
     res.status(200).json({ post, replies });
   } catch (error) {
@@ -132,6 +136,20 @@ const getReports = async (req, res) => {
   }
 };
 
+const dismissReport = async (req, res) => {
+  try {
+    const reportId = req.params.reportId;
+    const report = await Community.updateReportStatus(reportId, "dismissed", "Dismissed by admin");
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+    res.status(200).json({ message: "Report dismissed", report });
+  } catch (error) {
+    console.error("Error dismissing report:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 const updatePostStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -149,10 +167,42 @@ const updatePostStatus = async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
 
+    // Also resolve the report when moderation action is taken
+    await Community.resolveReportsForPost(req.params.postId, `Post status updated to ${status}`);
+
     res.status(200).json({ message: "Post status updated", post });
   } catch (error) {
     console.error("Error updating post status:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const deletePost = async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    const post = await Community.deleteForumPost(postId);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    res.status(200).json({ message: "Post permanently deleted" });
+  } catch (error) {
+    console.error("Error deleting post:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const resolveReport = async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    const reports = await Community.resolveReportsForPost(postId, "Resolved by admin");
+
+    res.status(200).json({
+      message: "Reports resolved successfully",
+      reports
+    });
+  } catch (error) {
+    console.error("Error resolving reports:", error.message);
+    res.status(500).json({ error: "Failed to resolve reports" });
   }
 };
 
@@ -165,5 +215,8 @@ module.exports = {
   likePost,
   submitReport,
   getReports,
+  dismissReport,
   updatePostStatus,
+  deletePost,
+  resolveReport,
 };

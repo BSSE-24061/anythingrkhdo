@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { appointmentApi, medicationApi } from "../../utils/apiHelper";
@@ -15,7 +15,9 @@ const MedicationLogs = () => {
   const user = getStoredUser();
   const [searchParams] = useSearchParams();
   const [patients, setPatients] = useState([]);
-  const [selectedPatient, setSelectedPatient] = useState(searchParams.get("patient") || "");
+  const [selectedPatient, setSelectedPatient] = useState(
+    searchParams.get("patient") || "",
+  );
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
@@ -50,60 +52,107 @@ const MedicationLogs = () => {
     loadLogs();
   }, [selectedPatient]);
 
+  const selectedPatientInfo = useMemo(
+    () => patients.find((patient) => patient.user_id === selectedPatient),
+    [patients, selectedPatient],
+  );
+
+  const totals = useMemo(
+    () => ({
+      taken: logs.filter((log) => log.status === "taken").length,
+      missed: logs.filter((log) => log.status === "missed").length,
+      pending: logs.filter((log) => log.status === "pending").length,
+    }),
+    [logs],
+  );
+
   return (
     <>
       <section className="page-heading">
         <div>
           <h1>Medication Logs</h1>
-          <p className="muted">View patient medication adherence and history (read-only).</p>
+          <p className="muted">
+            Review medication adherence across the full page, grouped with quick status counts.
+          </p>
         </div>
       </section>
 
-      <section className="grid-layout two-col">
-        <div className="card">
+      <section className="record-selector card">
+        <div>
           <div className="section-heading">
             <h3>Select Patient</h3>
           </div>
-          <select value={selectedPatient} onChange={(event) => setSelectedPatient(event.target.value)}>
+          <select
+            value={selectedPatient}
+            onChange={(event) => setSelectedPatient(event.target.value)}
+          >
             <option value="">Choose a patient</option>
             {patients.map((patient) => (
-              <option key={patient.user_id} value={patient.user_id}>{patient.full_name}</option>
+              <option key={patient.user_id} value={patient.user_id}>
+                {patient.full_name}
+              </option>
             ))}
           </select>
         </div>
-
-        <div className="card">
-          <div className="section-heading">
-            <h3>Medication Logs</h3>
+        {selectedPatientInfo && (
+          <div className="patient-summary">
+            <strong>{selectedPatientInfo.full_name}</strong>
+            <span>{selectedPatientInfo.email || "No email available"}</span>
+            <span>{selectedPatientInfo.phone || "No phone number"}</span>
           </div>
-          <div className="list-stack">
-            {logs.length ? logs.map((log) => (
-              <div className="list-item" key={log.log_id}>
-                <strong>{log.medication_name || "Medication"}</strong>
-                <span style={{
-                  display: "inline-block",
-                  fontSize: "0.8em",
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  backgroundColor: log.status === "taken" ? "#44aa44" : log.status === "missed" ? "#aa4444" : "#4444aa",
-                  color: "white",
-                  marginTop: "4px"
-                }}>
-                  {log.status?.toUpperCase()}
-                </span>
+        )}
+      </section>
+
+      <section className="doctor-stats">
+        <div className="stat-card">
+          <span className="muted">Taken</span>
+          <strong>{totals.taken}</strong>
+        </div>
+        <div className="stat-card">
+          <span className="muted">Pending</span>
+          <strong>{totals.pending}</strong>
+        </div>
+        <div className="stat-card">
+          <span className="muted">Missed</span>
+          <strong>{totals.missed}</strong>
+        </div>
+      </section>
+
+      <section className="card record-panel">
+        <div className="section-heading">
+          <h3>Medication Timeline</h3>
+          <span className="muted">{logs.length} logs</span>
+        </div>
+        <div className="resource-grid compact">
+          {logs.length ? (
+            logs.map((log) => (
+              <div className="metric-card" key={log.log_id}>
+                <div className="section-heading">
+                  <strong>{log.medication_name || "Medication"}</strong>
+                  <span className={`severity-pill ${log.status}`}>
+                    {log.status || "pending"}
+                  </span>
+                </div>
                 <p>
                   {DOSE_LABELS[log.dose_period] || "Scheduled"} dose:{" "}
                   {log.dose_dosage || log.dosage || "Dose not specified"}
                 </p>
-                <p>Scheduled: {log.scheduled_time ? new Date(log.scheduled_time).toLocaleString() : "N/A"}</p>
+                <p className="muted">
+                  Scheduled:{" "}
+                  {log.scheduled_time
+                    ? new Date(log.scheduled_time).toLocaleString()
+                    : "N/A"}
+                </p>
                 {log.status === "taken" && log.taken_at && (
-                  <p style={{ color: "#44aa44", fontWeight: 600, marginTop: 4 }}>
+                  <p className="success-text">
                     Taken at: {new Date(log.taken_at).toLocaleString()}
                   </p>
                 )}
               </div>
-            )) : <p className="muted">No medication logs for this patient.</p>}
-          </div>
+            ))
+          ) : (
+            <p className="muted">No medication logs for this patient.</p>
+          )}
         </div>
       </section>
     </>

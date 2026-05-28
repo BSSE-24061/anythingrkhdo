@@ -64,9 +64,24 @@ const getMedicationsByPrescription = async (prescriptionId) => {
     return result.rows;
 };
 
+const getPrescriptionWithAppointment = async (prescriptionId) => {
+    const query = `
+        SELECT
+            p.*,
+            a.status AS appointment_status,
+            a.scheduled_at AS appointment_scheduled_at
+        FROM prescriptions p
+        JOIN appointments a ON p.appointment_id = a.appointment_id
+        WHERE p.prescription_id = $1;
+    `;
+    const result = await db.query(query, [prescriptionId]);
+    return result.rows[0];
+};
+
 module.exports = {
     createPrescription,
     addPatientMedication,
     getPatientPrescriptions,
-    getMedicationsByPrescription
+    getMedicationsByPrescription,
+    getPrescriptionWithAppointment
 };

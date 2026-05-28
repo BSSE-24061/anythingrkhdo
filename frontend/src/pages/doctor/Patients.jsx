@@ -5,6 +5,9 @@ import { appointmentApi } from "../../utils/apiHelper";
 import { patientsFromAppointments } from "../../utils/doctorPatients";
 import { getStoredUser } from "../../utils/session";
 
+const genderClass = (gender) =>
+  `doctor-gender-pill gender-${String(gender || "unknown").toLowerCase()}`;
+
 const Patients = () => {
   const navigate = useNavigate();
   const user = getStoredUser();
@@ -47,22 +50,24 @@ const Patients = () => {
         </div>
       </section>
 
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card record-selector" style={{ marginBottom: 20 }}>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search patients..." />
       </div>
 
-      <section className="list-stack">
+      <section className="resource-grid compact">
         {loading ? (
           <p>Loading patients...</p>
         ) : (
           filteredPatients.map((patient) => (
-            <div className="card" key={patient.user_id}>
+            <div className="patient-card" key={patient.user_id}>
               <div className="section-heading">
                 <div>
                   <h3>{patient.full_name}</h3>
                   <span>{patient.email || "No email available"}</span>
                 </div>
-                <span className="page-tag">{patient.gender || "unknown"}</span>
+                <span className={genderClass(patient.gender)}>
+                  {patient.gender || "unknown"}
+                </span>
               </div>
 
               <p>{patient.phone || "No phone number"}</p>

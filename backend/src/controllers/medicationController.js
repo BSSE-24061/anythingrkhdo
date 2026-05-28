@@ -1,12 +1,17 @@
 const Medication = require("../models/medicationModel");
 const Notification = require("../models/notificationModel");
 const Vital = require("../models/vitalModel");
-const { DOSE_SLOTS } = require("../constants/doseSlots");
+const {
+  DOSE_SLOTS,
+  isWithinDoseWindow,
+  getTimeWindowMessage,
+} = require("../constants/doseSlots");
 
 const formatDosePeriod = (period) => DOSE_SLOTS[period]?.label || "Scheduled";
 
 const createMissedDoseAlerts = async (patientId) => {
-  const missedLogs = await Medication.getUnalertedMissedMedicationLogs(patientId);
+  const missedLogs =
+    await Medication.getUnalertedMissedMedicationLogs(patientId);
 
   for (const log of missedLogs) {
     const doseLabel = formatDosePeriod(log.dose_period);
@@ -40,7 +45,7 @@ const createMissedDoseAlerts = async (patientId) => {
 
 const getMedications = async (req, res) => {
   try {
-    const status = req.query.status || 'approved';
+    const status = req.query.status || "approved";
     const medications = await Medication.getAllMedications(status);
     res.status(200).json(medications);
   } catch (error) {
@@ -155,13 +160,33 @@ const updateMedicationLogStatus = async (req, res) => {
 
     // Doctors cannot update medication logs - only patients or admins can
     if (userRole === "doctor") {
-      return res.status(403).json({ error: "Doctors cannot create or modify patient medication logs" });
+      return res
+        .status(403)
+        .json({
+          error: "Doctors cannot create or modify patient medication logs",
+        });
     }
 
     const validStatuses = ["pending", "taken", "missed"];
 
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid medication status" });
+    }
+
+    // Get the medication log FIRST to check dose_period
+    const existingLog = await Medication.getMedicationLogById(req.params.logId);
+    if (!existingLog) {
+      return res.status(404).json({ error: "Medication log not found" });
+    }
+
+    // Time window validation when marking as taken
+    if (status === "taken" && existingLog.dose_period) {
+      if (!isWithinDoseWindow(existingLog.dose_period)) {
+        const timeWindowMsg = getTimeWindowMessage(existingLog.dose_period);
+        return res.status(400).json({
+          error: `Cannot mark as taken. ${timeWindowMsg}`,
+        });
+      }
     }
 
     const resolvedTakenAt =

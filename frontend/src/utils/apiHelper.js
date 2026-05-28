@@ -111,6 +111,8 @@ export const forumApi = {
   reply: (payload) => api.post("/community/replies", payload),
   report: (payload) => api.post("/community/reports", payload),
   reports: () => api.get("/community/reports"),
+  dismissReport: (reportId) => api.patch(`/community/reports/${reportId}/dismiss`),
+  deletePost: (postId) => api.delete(`/community/posts/${postId}`),
   updatePostStatus: (postId, status) =>
     api.patch(`/community/posts/${postId}/status`, { status }),
 };

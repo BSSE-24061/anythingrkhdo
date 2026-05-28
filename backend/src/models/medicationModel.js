@@ -3,23 +3,38 @@ const db = require("../config/db");
 // Ensure status column exists
 const initDb = async () => {
   try {
-    await db.query("ALTER TABLE medications ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'approved'");
-    await db.query("ALTER TABLE patient_medications ADD COLUMN IF NOT EXISTS dosage_schedule JSONB");
-    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_period VARCHAR(20)");
-    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_dosage TEXT");
-    await db.query("ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS missed_alert_sent BOOLEAN NOT NULL DEFAULT FALSE");
+    await db.query(
+      "ALTER TABLE medications ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'approved'",
+    );
+    await db.query(
+      "ALTER TABLE patient_medications ADD COLUMN IF NOT EXISTS dosage_schedule JSONB",
+    );
+    await db.query(
+      "ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_period VARCHAR(20)",
+    );
+    await db.query(
+      "ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS dose_dosage TEXT",
+    );
+    await db.query(
+      "ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS missed_alert_sent BOOLEAN NOT NULL DEFAULT FALSE",
+    );
   } catch (err) {
     console.error("Failed to ensure medication columns:", err.message);
   }
 };
 initDb();
 
-const getAllMedications = async (status = 'approved') => {
-  if (status === 'all') {
-    const result = await db.query("SELECT * FROM medications ORDER BY name ASC");
+const getAllMedications = async (status = "approved") => {
+  if (status === "all") {
+    const result = await db.query(
+      "SELECT * FROM medications ORDER BY name ASC",
+    );
     return result.rows;
   }
-  const result = await db.query("SELECT * FROM medications WHERE status = $1 ORDER BY name ASC", [status]);
+  const result = await db.query(
+    "SELECT * FROM medications WHERE status = $1 ORDER BY name ASC",
+    [status],
+  );
   return result.rows;
 };
 
@@ -34,7 +49,7 @@ const createMedication = async (medicationData) => {
     name,
     type || null,
     description || null,
-    status || 'approved'
+    status || "approved",
   ]);
   return result.rows[0];
 };
@@ -174,6 +189,18 @@ const updateMedicationLogStatus = async (logId, status, takenAt) => {
   return result.rows[0];
 };
 
+const getMedicationLogById = async (logId) => {
+  const query = `
+    SELECT ml.*, pm.start_date, pm.end_date, m.name AS medication_name
+    FROM medication_logs ml
+    LEFT JOIN patient_medications pm ON ml.patient_medication_id = pm.patient_medication_id
+    LEFT JOIN medications m ON pm.medication_id = m.medication_id
+    WHERE ml.log_id = $1;
+  `;
+  const result = await db.query(query, [logId]);
+  return result.rows[0];
+};
+
 module.exports = {
   getAllMedications,
   createMedication,
@@ -186,4 +213,5 @@ module.exports = {
   markMedicationLogAlertSent,
   getPatientMedicationLogs,
   updateMedicationLogStatus,
+  getMedicationLogById,
 };

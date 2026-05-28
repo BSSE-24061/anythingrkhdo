@@ -134,3 +134,64 @@ export const isFutureSlotStrict = (dateValue, timeValue) => {
   // Add 5 seconds buffer to ensure it's truly in the future
   return new Date(iso).getTime() > Date.now() + 5000;
 };
+
+// Get dose period based on current time (morning, afternoon, evening)
+export const getDosePeriod = () => {
+  const timeStr = getCurrentIslamabadTime();
+  if (!timeStr) return "morning";
+
+  const [hour, minute] = timeStr.split(":").map(Number);
+  const totalMinutes = hour * 60 + minute;
+
+  // Morning: 7 AM to 12 PM (420-720 minutes)
+  if (totalMinutes >= 7 * 60 && totalMinutes < 12 * 60) {
+    return "morning";
+  }
+  // Afternoon: 12:01 PM to 4 PM (721-960 minutes)
+  if (totalMinutes >= 12 * 60 + 1 && totalMinutes < 16 * 60) {
+    return "afternoon";
+  }
+  // Evening: 4:01 PM to 12 AM (961-1440 minutes)
+  if (totalMinutes >= 16 * 60 + 1) {
+    return "evening";
+  }
+  // Early morning before 7 AM - still considered evening of previous day
+  return "evening";
+};
+
+// Check if current time is within the allowed window for a dose period
+export const isWithinDoseWindow = (dosePeriod) => {
+  const timeStr = getCurrentIslamabadTime();
+  if (!timeStr) return false;
+
+  const [hour, minute] = timeStr.split(":").map(Number);
+  const totalMinutes = hour * 60 + minute;
+
+  switch (dosePeriod) {
+    case "morning":
+      // 7 AM to 12 PM (420-720 minutes)
+      return totalMinutes >= 7 * 60 && totalMinutes < 12 * 60;
+    case "afternoon":
+      // 12:01 PM to 4 PM (721-960 minutes)
+      return totalMinutes >= 12 * 60 + 1 && totalMinutes < 16 * 60;
+    case "evening":
+      // 4:01 PM to 12 AM (961-1440 minutes)
+      return totalMinutes >= 16 * 60 + 1;
+    default:
+      return false;
+  }
+};
+
+// Get human-readable time window message for a dose period
+export const getTimeWindowMessage = (dosePeriod) => {
+  switch (dosePeriod) {
+    case "morning":
+      return "Available 7:00 AM - 11:59 AM";
+    case "afternoon":
+      return "Available 12:01 PM - 3:59 PM";
+    case "evening":
+      return "Available 4:01 PM - 11:59 PM";
+    default:
+      return "Scheduled dose";
+  }
+};

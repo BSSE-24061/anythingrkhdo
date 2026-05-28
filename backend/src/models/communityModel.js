@@ -5,6 +5,11 @@ const initForumTables = async () => {
   if (isInitialized) return;
   try {
     await db.query(`ALTER TABLE forum_posts ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
+    await db.query(`ALTER TABLE forum_reports ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'pending';`).catch(() => {});
+    await db.query(`ALTER TABLE forum_reports ALTER COLUMN status TYPE VARCHAR(30) USING status::text;`).catch(() => {});
+    await db.query(`ALTER TABLE forum_reports ALTER COLUMN status SET DEFAULT 'pending';`).catch(() => {});
+    await db.query(`ALTER TABLE forum_reports ADD COLUMN IF NOT EXISTS resolution VARCHAR(50);`).catch(() => {});
+    await db.query(`ALTER TABLE forum_reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP WITH TIME ZONE;`).catch(() => {});
     await db.query(`
       CREATE TABLE IF NOT EXISTS forum_post_likes (
         like_id SERIAL PRIMARY KEY,
@@ -161,11 +166,13 @@ const reportPost = async (postId, reportedBy, reason, description) => {
 };
 
 const getReportedPosts = async () => {
+  await initForumTables();
   const query = `
         SELECT fr.*, fp.title, fp.body, fp.status AS post_status, u.full_name AS reporter_name
         FROM forum_reports fr
         JOIN forum_posts fp ON fr.post_id = fp.post_id
         LEFT JOIN users u ON fr.reported_by = u.user_id
+        WHERE COALESCE(fr.status, 'pending') = 'pending'
         ORDER BY fr.created_at DESC;
     `;
   const result = await db.query(query);
@@ -184,6 +191,105 @@ const updateForumPostStatus = async (postId, status) => {
   return result.rows[0];
 };
 
+const quoteIdentifier = (value) => `"${String(value).replace(/"/g, '""')}"`;
+
+const deleteForumPost = async (postId) => {
+  await initForumTables();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const postResult = await client.query(
+      "SELECT * FROM forum_posts WHERE post_id = $1;",
+      [postId],
+    );
+    const post = postResult.rows[0];
+    if (!post) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+
+    const references = await client.query(
+      `
+        SELECT DISTINCT kcu.table_name, kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'forum_posts';
+      `,
+    );
+
+    const deleteTargets = new Map();
+    references.rows.forEach((row) => {
+      deleteTargets.set(row.table_name, row.column_name);
+    });
+
+    const knownTables = await client.query(
+      `
+        SELECT table_name, column_name
+        FROM information_schema.columns
+        WHERE table_name IN ('forum_reports', 'forum_replies', 'forum_post_likes')
+          AND column_name = 'post_id';
+      `,
+    );
+
+    knownTables.rows.forEach((row) => {
+      deleteTargets.set(row.table_name, row.column_name);
+    });
+
+    for (const [tableName, columnName] of deleteTargets.entries()) {
+      await client.query(
+        `DELETE FROM ${quoteIdentifier(tableName)} WHERE ${quoteIdentifier(columnName)} = $1;`,
+        [postId],
+      );
+    }
+
+    await client.query("DELETE FROM forum_posts WHERE post_id = $1;", [postId]);
+
+    await client.query("COMMIT");
+    return post;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const updateReportStatus = async (reportId, status, resolution = null) => {
+  await initForumTables();
+  const query = `
+        UPDATE forum_reports
+        SET status = $1,
+            resolution = $2,
+            resolved_at = NOW()
+        WHERE report_id = $3
+        RETURNING *;
+    `;
+  const result = await db.query(query, [status, resolution, reportId]);
+  return result.rows[0];
+};
+
+const resolveReportsForPost = async (postId, resolution) => {
+  await initForumTables();
+  const query = `
+        UPDATE forum_reports
+        SET status = 'resolved',
+            resolution = $2,
+            resolved_at = NOW()
+        WHERE post_id = $1
+          AND COALESCE(status, 'pending') = 'pending'
+        RETURNING *;
+    `;
+  const result = await db.query(query, [postId, resolution]);
+  return result.rows;
+};
+
 module.exports = {
   createForumPost,
   getForumPosts,
@@ -195,4 +301,7 @@ module.exports = {
   reportPost,
   getReportedPosts,
   updateForumPostStatus,
+  deleteForumPost,
+  updateReportStatus,
+  resolveReportsForPost,
 };

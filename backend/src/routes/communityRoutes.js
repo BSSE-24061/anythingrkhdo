@@ -26,7 +26,13 @@ router.post("/reports", communityController.submitReport);
 // GET /api/community/reports - View reported posts for moderation
 router.get("/reports", communityController.getReports);
 
+// PATCH /api/community/reports/:reportId/dismiss - Dismiss a single report
+router.patch("/reports/:reportId/dismiss", communityController.dismissReport);
+
 // PATCH /api/community/posts/:postId/status - Moderate a forum post
 router.patch("/posts/:postId/status", communityController.updatePostStatus);
+
+// DELETE /api/community/posts/:postId - Permanently remove a forum post
+router.delete("/posts/:postId", communityController.deletePost);
 
 module.exports = router;

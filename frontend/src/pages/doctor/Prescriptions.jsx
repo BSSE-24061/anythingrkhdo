@@ -53,6 +53,15 @@ const Prescriptions = () => {
     type: "",
     description: "",
   });
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -121,11 +130,12 @@ const Prescriptions = () => {
     [patients, selectedPatient],
   );
 
-  // Get all (pending, confirmed) appointments for the selected patient - exclude completed
+  // Get confirmed appointments for the selected patient.
   const availableAppointments = useMemo(() => {
     return appointments.filter(
       (apt) =>
-        apt.patient_user_id === selectedPatient && apt.status !== "completed",
+        apt.patient_user_id === selectedPatient &&
+        apt.status === "confirmed",
     );
   }, [appointments, selectedPatient]);
 
@@ -140,15 +150,15 @@ const Prescriptions = () => {
   const isAppointmentTimeReached = useMemo(() => {
     if (!selectedAppointmentData) return false;
     const appointmentStart = new Date(selectedAppointmentData.scheduled_at);
-    return new Date() >= appointmentStart;
-  }, [selectedAppointmentData]);
+    return now >= appointmentStart;
+  }, [now, selectedAppointmentData]);
 
   // Check if prescription can be created
   const canCreatePrescription = useMemo(() => {
     return (
       selectedPatient &&
       selectedAppointment &&
-      selectedAppointmentData?.status !== "completed" &&
+      selectedAppointmentData?.status === "confirmed" &&
       isAppointmentTimeReached
     );
   }, [
@@ -165,6 +175,12 @@ const Prescriptions = () => {
     if (selectedAppointmentData?.status === "completed") {
       return "Cannot prescribe - appointment has been marked as done";
     }
+    if (selectedAppointmentData?.status === "cancelled") {
+      return "Cannot prescribe - appointment has been cancelled";
+    }
+    if (selectedAppointmentData?.status !== "confirmed") {
+      return "Cannot prescribe until the appointment is confirmed";
+    }
     if (!isAppointmentTimeReached) {
       const appointmentTime = new Date(selectedAppointmentData?.scheduled_at);
       return `Prescription available from ${formatIslamabadDateTime(appointmentTime)}`;
@@ -175,6 +191,63 @@ const Prescriptions = () => {
     selectedAppointment,
     selectedAppointmentData,
     isAppointmentTimeReached,
+  ]);
+
+  const selectedPrescriptionData = useMemo(() => {
+    return prescriptions.find(
+      (prescription) => prescription.prescription_id === selectedPrescription,
+    );
+  }, [prescriptions, selectedPrescription]);
+
+  const selectedPrescriptionAppointment = useMemo(() => {
+    if (!selectedPrescriptionData?.appointment_id) return null;
+    return appointments.find(
+      (appointment) =>
+        appointment.appointment_id === selectedPrescriptionData.appointment_id,
+    );
+  }, [appointments, selectedPrescriptionData]);
+
+  const isSelectedPrescriptionAppointmentStarted = useMemo(() => {
+    if (!selectedPrescriptionAppointment) return false;
+    return now >= new Date(selectedPrescriptionAppointment.scheduled_at);
+  }, [now, selectedPrescriptionAppointment]);
+
+  const canAddMedication = useMemo(() => {
+    return (
+      selectedPrescription &&
+      selectedPrescriptionAppointment?.status === "confirmed" &&
+      isSelectedPrescriptionAppointmentStarted
+    );
+  }, [
+    selectedPrescription,
+    selectedPrescriptionAppointment,
+    isSelectedPrescriptionAppointmentStarted,
+  ]);
+
+  const medicationDisabledMessage = useMemo(() => {
+    if (!selectedPrescription) return "Choose a prescription first";
+    if (!selectedPrescriptionAppointment) {
+      return "Cannot add medication for this prescription appointment";
+    }
+    if (selectedPrescriptionAppointment.status === "completed") {
+      return "Cannot add medication - appointment has been marked as done";
+    }
+    if (selectedPrescriptionAppointment.status === "cancelled") {
+      return "Cannot add medication - appointment has been cancelled";
+    }
+    if (selectedPrescriptionAppointment.status !== "confirmed") {
+      return "Cannot add medication until the appointment is confirmed";
+    }
+    if (!isSelectedPrescriptionAppointmentStarted) {
+      return `Medication can be added from ${formatIslamabadDateTime(
+        selectedPrescriptionAppointment.scheduled_at,
+      )}`;
+    }
+    return "";
+  }, [
+    selectedPrescription,
+    selectedPrescriptionAppointment,
+    isSelectedPrescriptionAppointmentStarted,
   ]);
 
   const formatPrescriptionDate = (value) => {
@@ -260,6 +333,11 @@ const Prescriptions = () => {
       return;
     }
 
+    if (!canAddMedication) {
+      alert(medicationDisabledMessage || "Cannot add medication");
+      return;
+    }
+
     if (!medForm.medication_id) {
       alert("Please select a valid medication from the search list.");
       return;
@@ -314,6 +392,7 @@ const Prescriptions = () => {
       setPrescriptionMedications(medResponse.data || []);
     } catch (error) {
       console.error(error);
+      alert(error?.response?.data?.error || "Failed to add medication");
     } finally {
       if (medicationCreated) {
         setMedForm(emptyMedicationForm);
@@ -379,16 +458,16 @@ const Prescriptions = () => {
                   color: "#475569",
                 }}
               >
-                Appointment (ongoing appointments only)
+                Appointment (confirmed appointments only)
               </label>
               <select
                 value={selectedAppointment}
                 onChange={(event) => setSelectedAppointment(event.target.value)}
                 style={{ width: "100%" }}
               >
-                <option value="">Select an ongoing appointment</option>
+                <option value="">Select a confirmed appointment</option>
                 {availableAppointments.length === 0 ? (
-                  <option disabled>No ongoing appointments</option>
+                  <option disabled>No confirmed appointments</option>
                 ) : (
                   availableAppointments.map((apt) => (
                     <option key={apt.appointment_id} value={apt.appointment_id}>
@@ -400,8 +479,7 @@ const Prescriptions = () => {
               </select>
               {availableAppointments.length === 0 && (
                 <p style={{ fontSize: 12, color: "#ef4444", marginTop: 6 }}>
-                  No ongoing appointments. Complete an appointment first to
-                  prescribe.
+                  No confirmed appointments available for prescription.
                 </p>
               )}
             </div>
@@ -517,6 +595,21 @@ const Prescriptions = () => {
             onSubmit={addMedication}
             style={{ marginTop: 14 }}
           >
+            {selectedPrescription && !canAddMedication && (
+              <div
+                style={{
+                  padding: 12,
+                  background: "#fef3c7",
+                  border: "1px solid #fcd34d",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#92400e",
+                  fontWeight: 600,
+                }}
+              >
+                {medicationDisabledMessage}
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
@@ -668,7 +761,20 @@ const Prescriptions = () => {
                 }
               />
             </div>
-            <button type="submit" className="btn-soft">
+            <button
+              type="submit"
+              className="btn-soft"
+              disabled={!canAddMedication}
+              title={
+                !canAddMedication
+                  ? medicationDisabledMessage
+                  : "Add medication"
+              }
+              style={{
+                opacity: !canAddMedication ? 0.5 : 1,
+                cursor: !canAddMedication ? "not-allowed" : "pointer",
+              }}
+            >
               Add Medication + Log
             </button>
           </form>

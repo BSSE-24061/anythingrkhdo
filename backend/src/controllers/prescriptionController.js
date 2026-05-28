@@ -51,6 +51,56 @@ const normalizeDosageSchedule = (dosageSchedule) => {
     .filter((item) => isValidDosePeriod(item.period) && item.dosage);
 };
 
+const validatePrescribingWindow = (appointment) => {
+  const status = String(appointment?.status || appointment?.appointment_status || "")
+    .toLowerCase();
+
+  if (status === "completed") {
+    return {
+      ok: false,
+      statusCode: 400,
+      error:
+        "Cannot prescribe. Appointment has already been marked as done.",
+    };
+  }
+
+  if (status === "cancelled") {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "Cannot prescribe. This appointment has been cancelled.",
+    };
+  }
+
+  if (status !== "confirmed") {
+    return {
+      ok: false,
+      statusCode: 400,
+      error:
+        "Cannot prescribe until the doctor has confirmed the appointment.",
+    };
+  }
+
+  const appointmentStartTime = new Date(
+    appointment.scheduled_at || appointment.appointment_scheduled_at,
+  );
+  const now = new Date();
+  if (now < appointmentStartTime) {
+    const formattedTime = appointmentStartTime.toLocaleString("en-PK", {
+      timeZone: "Asia/Karachi",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    return {
+      ok: false,
+      statusCode: 400,
+      error: `Prescription can only be issued starting from the appointment time (${formattedTime})`,
+    };
+  }
+
+  return { ok: true };
+};
+
 // 1. Create the Master Prescription (The Diagnosis)
 const createMasterPrescription = async (req, res) => {
   try {
@@ -58,12 +108,10 @@ const createMasterPrescription = async (req, res) => {
       req.body;
 
     if (!patient_user_id || !doctor_user_id || !diagnosis || !appointment_id) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Patient ID, Doctor ID, Appointment ID, and Diagnosis are required",
-        });
+      return res.status(400).json({
+        error:
+          "Patient ID, Doctor ID, Appointment ID, and Diagnosis are required",
+      });
     }
 
     // Validate appointment exists
@@ -72,38 +120,21 @@ const createMasterPrescription = async (req, res) => {
       return res.status(404).json({ error: "Appointment not found" });
     }
 
-    // Verify appointment belongs to this patient and doctor
+    // Check if appointment belongs to this patient and doctor
     if (
       appointment.patient_user_id !== patient_user_id ||
       appointment.doctor_user_id !== doctor_user_id
     ) {
+      return res.status(403).json({
+        error: "Appointment does not match the selected patient and doctor",
+      });
+    }
+
+    const prescribingWindow = validatePrescribingWindow(appointment);
+    if (!prescribingWindow.ok) {
       return res
-        .status(403)
-        .json({
-          error: "Appointment does not match the selected patient and doctor",
-        });
-    }
-
-    // Check if appointment is already completed - cannot prescribe after marking done
-    if (appointment.status === "completed") {
-      return res.status(400).json({
-        error:
-          "Cannot create prescription. Appointment has already been marked as done. Prescriptions can only be issued during the appointment.",
-      });
-    }
-
-    // Check if current time is before appointment start time
-    const appointmentStartTime = new Date(appointment.scheduled_at);
-    const now = new Date();
-    if (now < appointmentStartTime) {
-      const formattedTime = appointmentStartTime.toLocaleString("en-PK", {
-        timeZone: "Asia/Karachi",
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-      return res.status(400).json({
-        error: `Prescription can only be issued starting from the appointment time (${formattedTime})`,
-      });
+        .status(prescribingWindow.statusCode)
+        .json({ error: prescribingWindow.error });
     }
 
     // 1. Create the prescription in the database
@@ -162,6 +193,25 @@ const addMedication = async (req, res) => {
       return res
         .status(400)
         .json({ error: "Select at least one dose timing and dosage" });
+    }
+
+    const prescription =
+      await Prescription.getPrescriptionWithAppointment(prescription_id);
+    if (!prescription) {
+      return res.status(404).json({ error: "Prescription not found" });
+    }
+
+    if (prescription.patient_user_id !== patient_user_id) {
+      return res.status(403).json({
+        error: "Prescription does not match the selected patient",
+      });
+    }
+
+    const prescribingWindow = validatePrescribingWindow(prescription);
+    if (!prescribingWindow.ok) {
+      return res
+        .status(prescribingWindow.statusCode)
+        .json({ error: prescribingWindow.error });
     }
 
     const newMedication = await Prescription.addPatientMedication({
